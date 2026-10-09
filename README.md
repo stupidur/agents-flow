@@ -103,6 +103,78 @@ PYTHONPATH=src python3 -m agentflow \
 
 `bootstrap` 只初始化文件，不会执行 Shopify 开发，也不会要求 Figma URL。
 
+### 全局公共层：`--global`
+
+`register` 和 `bootstrap` 默认仍使用当前目录，也可以通过 `--project`
+选择项目。添加 `--global` 后，安装目标改为 `~/.agents/`；`--global`
+与 `--project` 互斥。
+
+```bash
+# 首次全局登记时，通过环境变量或 --system-root 指定中央配置仓库
+export AGENT_SYSTEM_ROOT=/path/to/agents-flow
+agentflow register --type shopify --global
+agentflow bootstrap --global --client codex
+```
+
+全局布局如下，不会再嵌套一层 `.agents/`：
+
+```text
+~/.agents/
+├── project.yaml       # 全局默认项目类型、允许的 Workflow、中央仓库路径
+├── AGENTS.md          # 全局规则入口
+├── agents/
+├── skills/
+├── rules/
+├── memory/
+├── mcp/
+│   ├── profiles/
+│   └── manifest.json
+└── clients/           # 选定客户端的薄适配文件
+```
+
+自定义目录可使用 `AGENTFLOW_GLOBAL_ROOT`，也可以传入 `--global-root`：
+
+```bash
+agentflow register --type shopify --global --global-root /workspace/.agents
+agentflow bootstrap --global --global-root /workspace/.agents --client codex
+export AGENTFLOW_GLOBAL_ROOT=/workspace/.agents
+```
+
+全局注册后，未注册的项目使用全局项目类型生成计划；当前目录仍是任务根目录。
+已有项目登记继续决定该项目允许的 Workflow 和权限，全局配置不会扩展其权限。
+生成计划时会引用全局 `AGENTS.md`、rules 和公共记忆入口；本地没有技能或
+MCP profile 时，使用全局安装路径。
+
+```bash
+cd /path/to/shopify-theme
+agentflow plan shopify-project-onboarding
+agentflow plan shopify-development --set source_design=existing
+```
+
+计划要求生成的项目 `AGENTS.md` 包含“全局规则”引用，并遵守适用的全局约束；
+项目规则不能静默放宽全局规则。项目结构和需求仍必须来自实际发现证据。
+全局文件只作为只读上下文，任务代码、`AGENTS.md` 和产物写在目标项目中。
+
+在全局模式下，Shopify 初始化器可复用已有全局规则和适配文件：
+
+```bash
+python3 "$AGENT_SYSTEM_ROOT/skills/shopify/initialize-shopify-project/scripts/init_shopify_project.py" \
+  --target /path/to/shopify-theme --global-root "$AGENTFLOW_GLOBAL_ROOT" --dry-run
+```
+
+去掉 `--dry-run` 后仅合并项目的 `.env` 空占位和 `.gitignore`；默认不重复复制
+全局规则或客户端配置。生成项目 `AGENTS.md` 仍由 onboarding 的证据交接完成。
+
+全局 bootstrap 保留冲突文件，替换仍需显式 `--force`。MCP profile 和客户端
+适配文件属于配置产物，不会安装或启动服务。`clients/` 中的适配文件需要由
+执行器集成；不会覆盖已有 `~/.codex/` 等用户配置或凭据，也不表示指定 Agent
+路由已经可用。`agentflow run` 的原有快捷启动仍要求项目客户端适配器；全局
+公共层可直接用于 `plan` 生成的手动 handoff。
+
+全局登记记录中央仓库位置，因此未设置 `AGENT_SYSTEM_ROOT` 时，CLI 会从
+全局登记恢复该位置。中央仓库移动后，应更新环境变量或重新登记。全局目录
+不是项目目录；不会被父目录发现逻辑误当作包含所有项目的根目录。
+
 ### `plan`：生成某个 Workflow 的运行计划
 
 它会在目标项目默认生成一个可手动交接的 Workflow 包，不会调用 AI：
@@ -183,7 +255,7 @@ agentflow run code-review \
 - `source_design=figma`：加载 Figma 步骤，并同时提供 `figma_desktop_url`、`figma_mobile_url`、`supplemental_details_confirmed=true`。
 - `shopify_docs_required=true`：加载 Shopify Dev MCP。
 - `repository_is_remote=true`：加载 GitHub 只读上下文。
-- `visual_validation_required=true`：加载 Ego Browser 和浏览器验证 Profile。
+- `visual_validation_required=true`：加载 Computer Use、Ego Browser、Playwright CLI 技能和浏览器验证 Profile。
 - `requirements_source=basecamp`：在 Product Spec 中加载 Basecamp。
 - `existing_behavior_required=true`：在 Product Spec 中读取现有项目行为。
 
@@ -382,7 +454,7 @@ flowchart LR
 | OpenCode | 根 `opencode.json` | 直接读取 `.agents/skills/` | 根 `opencode.json` |
 | Oh My Pi | 复用 Claude/OpenCode Agent discovery | 直接读取 `.agents/skills/` | 复用根 `.mcp.json` |
 
-`project-files`、Web Search 等客户端内置工具不伪装成 MCP。GitHub/Basecamp 的 Skill/CLI 或 MCP Connector 必须由 Workflow 步骤明确选择，且远程读取只允许只读操作；在 ChatGPT/Codex 中，浏览器和桌面 UI 操作必须先使用已安装的 Computer Use 插件，只有记录其不可用或实际调用失败后才可降级到内置 Browser、Chrome control 或 vendored `ego-browser` CLI Skill；非 GPT 客户端使用 `ego-browser` 作为 portable fallback。Figma 同时生成本机 `figma-desktop-mcp`（`http://127.0.0.1:3845/mcp`）和使用 `FIGMA_API_KEY` 环境变量的 `figma-developer-mcp`，Shopify Dev 使用标准 MCP。Codex 已登录的 Figma Connector 仍可使用，但它只是优化路径，不能导出 Token，也不是其他客户端的依赖。
+`project-files`、Web Search 等客户端内置工具不伪装成 MCP。GitHub/Basecamp 的 Skill/CLI 或 MCP Connector 必须由 Workflow 步骤明确选择，且远程读取只允许只读操作；在 ChatGPT/Codex 中，浏览器和桌面 UI 操作必须先使用已安装的 Computer Use 插件；浏览器验证在记录其不可用、不支持当前操作或实际调用失败后，回退到 `ego-browser`，Ego Browser 也不可用、不支持或失败时，再使用 `playwright-cli`。非 GPT 客户端从 Ego Browser 开始，必要时回退到 Playwright CLI。两种 CLI 共享 `browser-preview` 权限范围，不替代原生桌面控制。Bootstrap 会复制两个 CLI 技能，但不会安装可执行程序或浏览器；Playwright CLI 使用官方 `@playwright/cli` 包，命令见项目内技能。Figma 同时生成本机 `figma-desktop-mcp`（`http://127.0.0.1:3845/mcp`）和使用 `FIGMA_API_KEY` 环境变量的 `figma-developer-mcp`，Shopify Dev 使用标准 MCP。Codex 已登录的 Figma Connector 仍可使用，但它只是优化路径，不能导出 Token，也不是其他客户端的依赖。
 
 ## 为项目接入
 

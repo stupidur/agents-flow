@@ -27,6 +27,7 @@ def parse_args() -> argparse.Namespace:
         description="Install Shopify agent rules and local tool configuration."
     )
     parser.add_argument("--target", type=Path, required=True, help="Shopify project root")
+    parser.add_argument("--global-root", type=Path, help="Reuse the installed global rules and client adapters without copying a project-local layer")
     parser.add_argument("--dry-run", action="store_true", help="Report without writing")
     parser.add_argument(
         "--force",
@@ -154,11 +155,22 @@ def main() -> int:
         print(f"error: bundled templates are missing: {TEMPLATES}", file=sys.stderr)
         return 2
 
-    mappings = {**FILE_MAPPINGS, **all_rule_mappings()}
+    global_root = args.global_root.expanduser().resolve() if args.global_root else None
+    inherited_rules: list[Path] = []
+    if global_root:
+        required = [global_root / "AGENTS.md"]
+        inherited_rules = [global_root / name for name in all_rule_mappings()]
+        required.extend(inherited_rules)
+        missing = [str(path) for path in required if not path.is_file()]
+        if missing:
+            print(f"error: global layer is incomplete: {', '.join(missing)}", file=sys.stderr)
+            return 2
+    mappings = {} if global_root else {**FILE_MAPPINGS, **all_rule_mappings()}
     if args.copy_guides:
         mappings.update(all_guide_mappings())
 
     report: list[dict[str, str]] = []
+    report.extend({"path": str(path), "action": "inherited"} for path in inherited_rules)
     try:
         for source_name, destination_name in sorted(mappings.items()):
             source = TEMPLATES / source_name
@@ -185,7 +197,7 @@ def main() -> int:
         return 2
 
     if args.json:
-        print(json.dumps({"target": str(target), "dry_run": args.dry_run, "files": report}, indent=2))
+        print(json.dumps({"target": str(target), "global_root": str(global_root) if global_root else None, "dry_run": args.dry_run, "files": report}, indent=2))
     else:
         mode = "DRY RUN" if args.dry_run else "APPLIED"
         print(f"{mode}: {target}")

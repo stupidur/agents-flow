@@ -4,7 +4,7 @@ import unittest
 
 from agentflow.cli import build_parser, parse_flags
 from agentflow.bootstrap import bootstrap_project
-from agentflow.loader import AgentFlow, ConfigurationError, condition_matches, find_project_file, safe_child
+from agentflow.loader import AgentFlow, ConfigurationError, condition_matches, find_project_file, load_yaml, safe_child
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -240,6 +240,11 @@ class LoaderTests(unittest.TestCase):
             self.assertTrue((project / ".agents/memory/shopify.md").is_file())
             self.assertTrue((project / ".agents/skills/ego-browser/SKILL.md").is_file())
             self.assertTrue((project / ".agents/skills/codex-computer-use/SKILL.md").is_file())
+            self.assertTrue((project / ".agents/skills/playwright-cli/SKILL.md").is_file())
+            browser_profile = load_yaml(project / ".agents/mcp/profiles/browser-preview.yaml")["profile"]
+            self.assertEqual(browser_profile["fallbacks"][0]["skill"], "shared/playwright-cli")
+            self.assertEqual(browser_profile["tools"]["allow"], ["open_local", "screenshot", "inspect_console"])
+            self.assertEqual(browser_profile["tools"]["deny"], ["submit_form", "upload_file", "publish"])
             self.assertTrue((project / ".agents/skills/workflow-execution/SKILL.md").is_file())
             self.assertTrue((project / ".agents/agents/shopify-developer.yaml").is_file())
             self.assertTrue((project / ".agents/mcp/manifest.json").is_file())
@@ -253,6 +258,7 @@ class LoaderTests(unittest.TestCase):
             self.assertIn('model_reasoning_effort = "high"', shopify_agent)
             self.assertTrue((project / ".claude/agents/shopify-developer.md").is_file())
             self.assertTrue((project / ".claude/skills/ego-browser/SKILL.md").is_file())
+            self.assertTrue((project / ".claude/skills/playwright-cli/SKILL.md").is_file())
             self.assertTrue((project / ".mcp.json").is_file())
             self.assertTrue((project / "opencode.json").is_file())
             self.assertTrue((project / ".omp/config.yml").is_file())
@@ -263,6 +269,7 @@ class LoaderTests(unittest.TestCase):
             self.assertIn("enabled = true", codex_config)
             self.assertIn("FIGMA_API_KEY=", (project / ".env.example").read_text())
             mcp = __import__("json").loads((project / ".mcp.json").read_text())["mcpServers"]
+            self.assertNotIn("playwright-cli", mcp)
             self.assertEqual(mcp["figma-desktop-mcp"]["url"], "http://127.0.0.1:3845/mcp")
             self.assertEqual(
                 mcp["figma-developer-mcp"]["env"]["FIGMA_API_KEY"],
@@ -366,6 +373,7 @@ class LoaderTests(unittest.TestCase):
         visual = plan["steps"][-1]
         self.assertEqual(visual["id"], "visual_validation")
         self.assertIn("shared/codex-computer-use", visual["skills"])
+        self.assertIn("shared/playwright-cli", visual["skills"])
         self.assertEqual(visual["mcp_profiles"], ["project-files-workspace-write", "browser-preview"])
 
         remote = next(step for step in plan["steps"] if step["id"] == "inspect_repository_context")
@@ -385,7 +393,8 @@ class LoaderTests(unittest.TestCase):
 
         prompt = build_execution_prompt(plan, "Verify the local storefront", Path("plan.json"))
         self.assertIn("installed Computer Use plugin first", prompt)
-        self.assertIn("falling back to the built-in Browser, Chrome control, or `ego-browser`", prompt)
+        self.assertIn("falling back to `ego-browser`", prompt)
+        self.assertIn("use `playwright-cli`", prompt)
         self.assertNotIn("`node_repl` + `@oai/sky`", prompt)
 
     def test_java_remote_context_uses_explicit_mcp_route(self) -> None:

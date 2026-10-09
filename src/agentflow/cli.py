@@ -8,7 +8,7 @@ from typing import Any
 
 import yaml
 
-from agentflow.loader import AgentFlow, ConfigurationError
+from agentflow.loader import AgentFlow, ConfigurationError, load_yaml
 from agentflow.bootstrap import SUPPORTED_CLIENTS, bootstrap_project
 from agentflow.runtime import (
     default_sandbox,
@@ -26,7 +26,8 @@ def parse_value(raw: str) -> Any:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="agentflow", description="Resolve project-scoped agent workflows")
-    parser.add_argument("--system-root", type=Path, default=Path(os.environ.get("AGENT_SYSTEM_ROOT", Path.cwd())))
+    parser.add_argument("--system-root", type=Path, help="Central configuration directory; otherwise use AGENT_SYSTEM_ROOT or global registration")
+    parser.add_argument("--global-root", type=Path, default=Path(os.environ.get("AGENTFLOW_GLOBAL_ROOT", Path.home() / ".agents")), help="Shared global layer directory (default: ~/.agents)")
     commands = parser.add_subparsers(dest="command", required=True)
 
     plan = commands.add_parser("plan", help="Generate a workflow handoff package")
@@ -56,13 +57,19 @@ def build_parser() -> argparse.ArgumentParser:
     )
 
     register = commands.add_parser("register", help="Create a lightweight project entry")
-    register.add_argument("--project", type=Path, default=Path.cwd())
+    register_scope = register.add_mutually_exclusive_group()
+    register_scope.add_argument("--project", type=Path, default=Path.cwd())
+    register_scope.add_argument("--global", dest="global_scope", action="store_true", help="Register the global shared layer instead of a project")
+    register.add_argument("--global-root", type=Path, default=argparse.SUPPRESS)
     register.add_argument("--type", choices=["default", "java", "shopify"], required=True)
     register.add_argument("--project-id")
     register.add_argument("--force", action="store_true")
 
     bootstrap = commands.add_parser("bootstrap", help="Materialize portable skills and client adapters")
-    bootstrap.add_argument("--project", type=Path, default=Path.cwd())
+    bootstrap_scope = bootstrap.add_mutually_exclusive_group()
+    bootstrap_scope.add_argument("--project", type=Path, default=Path.cwd())
+    bootstrap_scope.add_argument("--global", dest="global_scope", action="store_true", help="Materialize the global shared layer instead of a project")
+    bootstrap.add_argument("--global-root", type=Path, default=argparse.SUPPRESS)
     bootstrap.add_argument("--client", action="append", choices=SUPPORTED_CLIENTS, default=[])
     bootstrap.add_argument("--force", action="store_true")
 
@@ -85,8 +92,15 @@ def parse_flags(values: list[str]) -> dict[str, Any]:
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    flow = AgentFlow(args.system_root)
     try:
+        system_root = args.system_root or os.environ.get("AGENT_SYSTEM_ROOT")
+        if system_root is None:
+            global_file = args.global_root.expanduser() / "project.yaml"
+            if global_file.is_file():
+                global_config = load_yaml(global_file)
+                if global_config.get("scope") == "global":
+                    system_root = global_config.get("system_root")
+        flow = AgentFlow(Path(system_root) if system_root else Path.cwd(), args.global_root)
         if args.command == "plan":
             result = flow.plan(args.workflow, args.project, parse_flags(args.set))
             bundle = prepare_workflow_bundle(result, args.prompt or "", args.output_dir)
@@ -133,16 +147,14 @@ def main(argv: list[str] | None = None) -> int:
             print("Agent Flow configuration is valid.")
             return 0
         if args.command == "register":
-            result = flow.register_project(
-                args.project,
-                args.type,
-                args.project_id,
-                force=args.force,
-            )
+            if args.global_scope:
+                result = flow.register_global(args.type, args.project_id, force=args.force)
+            else:
+                result = flow.register_project(args.project, args.type, args.project_id, force=args.force)
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 0
         if args.command == "bootstrap":
-            result = bootstrap_project(flow, args.project, args.client, force=args.force)
+            result = bootstrap_project(flow, args.project, args.client, force=args.force, global_scope=args.global_scope)
             print(json.dumps(result, ensure_ascii=False, indent=2))
             return 1 if result["conflicts"] else 0
         print(json.dumps(flow.doctor(), ensure_ascii=False, indent=2))

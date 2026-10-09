@@ -57,9 +57,14 @@ def _portable_skill_content(skill: dict[str, Any]) -> str:
     return f"---\n{front}\n---\n\n{body}"
 
 
+def _assert_safe_destination(path: Path) -> None:
+    for candidate in (path, *path.parents):
+        if candidate.is_symlink():
+            raise ConfigurationError(f"Refusing to write through symlink: {candidate}")
+
+
 def _write_text(path: Path, content: str, *, force: bool) -> str:
-    if path.is_symlink():
-        raise ConfigurationError(f"Refusing to write through symlink: {path}")
+    _assert_safe_destination(path)
     if path.exists():
         if not path.is_file():
             raise ConfigurationError(f"Destination is not a file: {path}")
@@ -86,6 +91,7 @@ def _copy_skill(skill: dict[str, Any], destination: Path, *, force: bool) -> lis
             continue
         relative = source.relative_to(source_dir)
         target = destination / relative
+        _assert_safe_destination(target)
         content = _portable_skill_content(skill) if relative.as_posix() == "SKILL.md" else source.read_text(encoding="utf-8") if source.suffix in {".md", ".py", ".js", ".mjs", ".json", ".yaml", ".yml", ".txt"} else None
         if content is None:
             if target.exists() and target.read_bytes() == source.read_bytes():
@@ -112,6 +118,7 @@ def _copy_memory(source_root: Path, destination_root: Path, *, force: bool) -> l
             continue
         relative = source.relative_to(source_root)
         target = destination_root / relative
+        _assert_safe_destination(target)
         if source.suffix.lower() in {".md", ".txt", ".json", ".yaml", ".yml", ".toml"}:
             action = _write_text(target, source.read_text(encoding="utf-8"), force=force)
         else:
@@ -267,11 +274,32 @@ def _opencode_config(agents: list[dict[str, Any]], profiles: set[str]) -> str:
     return json.dumps({"$schema": "https://opencode.ai/config.json", "mcp": mcp, "agent": agent_entries}, ensure_ascii=False, indent=2) + "\n"
 
 
-def bootstrap_project(flow: AgentFlow, project_path: Path, clients: list[str], *, force: bool = False) -> dict[str, Any]:
-    project_file = find_project_file(project_path)
-    if project_file is None:
-        raise ConfigurationError("Register the target project before bootstrapping clients")
-    project, project_root = flow.load_project(project_path)
+def bootstrap_project(
+    flow: AgentFlow,
+    project_path: Path,
+    clients: list[str],
+    *,
+    force: bool = False,
+    global_scope: bool = False,
+) -> dict[str, Any]:
+    if global_scope:
+        if flow.global_root_is_symlink:
+            raise ConfigurationError("Refusing to bootstrap through a symlinked global directory")
+        project = flow.global_config()
+        if project is None:
+            raise ConfigurationError("Register the global layer with register --global before bootstrap --global")
+        project_root = flow.global_root
+        shared_root = flow.global_root
+        adapter_root = shared_root / "clients"
+        if shared_root == flow.system_root:
+            raise ConfigurationError("The global layer must not overwrite the Agent System source directory")
+    else:
+        project_file = find_project_file(project_path)
+        if project_file is None:
+            raise ConfigurationError("Register the target project before bootstrapping clients")
+        project, project_root = flow.load_project(project_path)
+        shared_root = project_root / ".agents"
+        adapter_root = project_root
     selected = list(dict.fromkeys(clients or SUPPORTED_CLIENTS))
     invalid = [client for client in selected if client not in SUPPORTED_CLIENTS]
     if invalid:
@@ -293,11 +321,12 @@ def bootstrap_project(flow: AgentFlow, project_path: Path, clients: list[str], *
             parsed = parse_skill(_skill_source_path(source))
             parsed.update(source)
             skills[source["id"]] = parsed
-    # Materialize the portable browser fallback. GPT/Codex uses its installed
-    # Computer Use plugin first; non-GPT clients can use this CLI adapter.
+    # Materialize both portable browser routes. GPT/Codex uses Computer Use
+    # first; non-GPT clients start with Ego Browser, then Playwright CLI.
     if "browser-preview" in profile_ids:
-        ego = flow._load_skill("shared/ego-browser", project)
-        skills[ego["id"]] = ego
+        for skill_id in ("shared/ego-browser", "shared/playwright-cli"):
+            browser_skill = flow._load_skill(skill_id, project)
+            skills[browser_skill["id"]] = browser_skill
 
     agents = [flow._load_agent(agent_id) for agent_id in sorted(agent_ids)]
     names: dict[str, str] = {}
@@ -308,21 +337,21 @@ def bootstrap_project(flow: AgentFlow, project_path: Path, clients: list[str], *
         names[name] = skill_id
 
     report: list[dict[str, str]] = []
-    report.extend(_copy_memory(flow.system_root / "memory", project_root / ".agents" / "memory", force=force))
+    report.extend(_copy_memory(flow.system_root / "memory", shared_root / "memory", force=force))
     for skill in skills.values():
-        report.extend(_copy_skill(skill, project_root / ".agents" / "skills" / _portable_name(skill), force=force))
+        report.extend(_copy_skill(skill, shared_root / "skills" / _portable_name(skill), force=force))
     rules_root = flow.system_root / "rules"
     if rules_root.is_dir():
         for source in sorted(rules_root.rglob("*.md")):
-            target = project_root / ".agents" / "rules" / source.relative_to(rules_root)
+            target = shared_root / "rules" / source.relative_to(rules_root)
             report.append({"path": str(target), "action": _write_text(target, source.read_text(encoding="utf-8"), force=force)})
     for agent in agents:
         agent_id = str(agent["agent"]["id"])
-        target = project_root / ".agents" / "agents" / f"{agent_id}.yaml"
+        target = shared_root / "agents" / f"{agent_id}.yaml"
         report.append({"path": str(target), "action": _write_text(target, yaml.safe_dump(agent, sort_keys=False, allow_unicode=True), force=force)})
     for profile_id in sorted(profile_ids):
         profile = load_yaml(flow.system_root / "mcp" / "profiles" / f"{profile_id}.yaml")
-        target = project_root / ".agents" / "mcp" / "profiles" / f"{profile_id}.yaml"
+        target = shared_root / "mcp" / "profiles" / f"{profile_id}.yaml"
         report.append({"path": str(target), "action": _write_text(target, yaml.safe_dump(profile, sort_keys=False, allow_unicode=True), force=force)})
 
     providers = {str(agent["agent"].get("model_provider")) for agent in agents if agent["agent"].get("model_provider")}
@@ -339,54 +368,74 @@ def bootstrap_project(flow: AgentFlow, project_path: Path, clients: list[str], *
         "portable_mcp_servers": sorted(_mcp_servers(profile_ids)),
         "native_or_skill_adapters": {
             "project-files": "client built-in filesystem tools",
-            "browser-preview": "Computer Use plugin first in ChatGPT/Codex; ego-browser skill/CLI only after recorded unavailability or failure, and as the portable non-GPT fallback",
+            "browser-preview": "Computer Use plugin first in ChatGPT/Codex; after recorded unavailability or failure (including unsupported operations), try ego-browser, then playwright-cli if ego-browser is unavailable, unsupported, or fails; non-GPT clients start with ego-browser",
             "github-readonly": "Use exactly the Workflow-declared GitHub MCP or Skill/gh CLI route",
             "basecamp-readonly": "Use exactly the Workflow-declared Basecamp MCP or Skill/CLI route",
             "public-web-search": "client built-in web search",
         },
         "credentials": credentials,
     }
-    report.append({"path": str(project_root / ".agents/mcp/manifest.json"), "action": _write_text(project_root / ".agents/mcp/manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", force=force)})
+    report.append({"path": str(shared_root / "mcp/manifest.json"), "action": _write_text(shared_root / "mcp/manifest.json", json.dumps(manifest, ensure_ascii=False, indent=2) + "\n", force=force)})
 
     if "codex" in selected:
-        report.append({"path": str(project_root / ".codex/config.toml"), "action": _write_text(project_root / ".codex/config.toml", _codex_config(agents, profile_ids), force=force)})
+        report.append({"path": str(adapter_root / ".codex/config.toml"), "action": _write_text(adapter_root / ".codex/config.toml", _codex_config(agents, profile_ids), force=force)})
         for agent in agents:
             agent_id = str(agent["agent"]["id"])
-            target = project_root / ".codex" / "agents" / f"{agent_id}.toml"
+            target = adapter_root / ".codex" / "agents" / f"{agent_id}.toml"
             report.append({"path": str(target), "action": _write_text(target, _codex_agent_toml(agent), force=force)})
     if "claude" in selected or "omp" in selected:
         for agent in agents:
             agent_id = str(agent["agent"]["id"])
-            target = project_root / ".claude" / "agents" / f"{agent_id}.md"
+            target = adapter_root / ".claude" / "agents" / f"{agent_id}.md"
             report.append({"path": str(target), "action": _write_text(target, _claude_agent_markdown(agent), force=force)})
         for skill in skills.values():
             name = _portable_name(skill)
-            shim = f"---\nname: {name}\ndescription: {json.dumps(_description(skill), ensure_ascii=False)}\n---\n\nRead and follow `../../../.agents/skills/{name}/SKILL.md` completely. Resolve its supporting files from that canonical directory.\n"
-            target = project_root / ".claude" / "skills" / name / "SKILL.md"
+            skill_reference = str(shared_root / "skills" / name / "SKILL.md") if global_scope else f"../../../.agents/skills/{name}/SKILL.md"
+            shim = f"---\nname: {name}\ndescription: {json.dumps(_description(skill), ensure_ascii=False)}\n---\n\nRead and follow `{skill_reference}` completely. Resolve its supporting files from that canonical directory.\n"
+            target = adapter_root / ".claude" / "skills" / name / "SKILL.md"
             report.append({"path": str(target), "action": _write_text(target, shim, force=force)})
     if "claude" in selected or "omp" in selected:
         shared_mcp = json.dumps({"mcpServers": _mcp_servers(profile_ids)}, ensure_ascii=False, indent=2) + "\n"
-        report.append({"path": str(project_root / ".mcp.json"), "action": _write_text(project_root / ".mcp.json", shared_mcp, force=force)})
+        report.append({"path": str(adapter_root / ".mcp.json"), "action": _write_text(adapter_root / ".mcp.json", shared_mcp, force=force)})
     if "opencode" in selected:
-        report.append({"path": str(project_root / "opencode.json"), "action": _write_text(project_root / "opencode.json", _opencode_config(agents, profile_ids), force=force)})
+        report.append({"path": str(adapter_root / "opencode.json"), "action": _write_text(adapter_root / "opencode.json", _opencode_config(agents, profile_ids), force=force)})
     if "omp" in selected:
         omp_config = "setupVersion: 1\n# OMP discovers .agents skills, .claude agents, and root .mcp.json.\n"
-        report.append({"path": str(project_root / ".omp/config.yml"), "action": _write_text(project_root / ".omp/config.yml", omp_config, force=force)})
+        report.append({"path": str(adapter_root / ".omp/config.yml"), "action": _write_text(adapter_root / ".omp/config.yml", omp_config, force=force)})
 
-    env_example = project_root / ".env.example"
+    env_example = shared_root / ".env.example" if global_scope else project_root / ".env.example"
     env_action = _merge_env_example(env_example, credentials)
     if env_action != "unchanged" or env_example.exists():
         report.append({"path": str(env_example), "action": env_action})
 
+    if global_scope:
+        rule_paths = sorted(str(path.relative_to(shared_root)) for path in (shared_root / "rules").rglob("*.md"))
+        guidance = "# Global AgentFlow Instructions\n\n"
+        guidance += "This is the shared global layer, not a task project or a writable repository root.\n\n"
+        guidance += "Read this file and all applicable global rules before project onboarding or implementation.\n"
+        guidance += "Project AGENTS.md must reference this global layer and retain its applicable constraints.\n"
+        guidance += "Do not silently weaken a global rule with a project rule; follow explicit user instructions and report conflicts.\n"
+        guidance += "Read global files as context only; keep code edits and task artifacts inside the target repository.\n"
+        guidance += "Load only the active step's Skills and MCP profiles; installing profiles does not start MCP services.\n"
+        guidance += "Client adapters under clients/ are generated integration files, not automatically activated user configuration.\n"
+        guidance += "Do not overwrite user client configuration, credentials, or authentication state.\n\n"
+        guidance += "## Global Rules\n\n" + "".join(f"- `{path}`\n" for path in rule_paths)
+        guidance += "\n## Shared Context\n\n- Skills: `skills/`\n- MCP profiles: `mcp/profiles/`\n- Memory index: `memory/README.md`\n"
+        target = shared_root / "AGENTS.md"
+        report.append({"path": str(target), "action": _write_text(target, guidance, force=force)})
+
     conflicts = [item for item in report if item["action"] == "conflict"]
     return {
+        "scope": "global" if global_scope else "project",
+        "shared_root": str(shared_root),
+        "client_adapter_root": str(adapter_root),
         "project_root": str(project_root),
         "clients": selected,
         "skills": sorted(names),
         "agents": sorted(agent_ids),
         "mcp_profiles": sorted(profile_ids),
         "memory_files": sorted(
-            item["path"] for item in report if "/.agents/memory/" in item["path"]
+            item["path"] for item in report if Path(item["path"]).is_relative_to(shared_root / "memory")
         ),
         "files": report,
         "conflicts": [item["path"] for item in conflicts],

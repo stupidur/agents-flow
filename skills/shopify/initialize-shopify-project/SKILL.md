@@ -7,6 +7,15 @@ description: Initialize or standardize a local Shopify theme repository with pro
 
 Create a complete, project-local Shopify agent baseline. Preserve user files, credentials, Git state, and remote resources.
 
+When the handoff declares `global_context`, read its global `AGENTS.md` and
+applicable rules first. Pass `--global-root <global_context.root>` to both
+initializer commands below. This mode reuses the global rules and client
+adapter files instead of copying them into the project; `.env` placeholders
+and `.gitignore` still merge locally. Add a `全局规则` section to the generated
+project `AGENTS.md` with actual global instruction and rule paths. Preserve
+applicable global constraints, report conflicts, and keep the global layer
+read-only during project onboarding.
+
 ## Workflow
 
 1. Resolve the target repository. Never assume the workspace root is the Shopify project when it contains multiple repositories.
@@ -26,6 +35,9 @@ Create a complete, project-local Shopify agent baseline. Preserve user files, cr
 
 6. Read `assets/templates/guides/init-shopify-project.md` completely. Generate or merge `<project>/AGENTS.md` from repository evidence. Preserve useful existing content, add project-specific exceptions and a dated revision note, and include every copied rule under “规则文件匹配”. Do not copy generic claims into the project summary. When the active workflow grants `document_write`, create or update `AGENTS.md` without asking for a second confirmation.
 7. Install project-local skills when initialization includes dependency setup:
+
+   Skip duplicate skill installation when the required Skills already exist in
+   the global layer selected by the handoff; verify their declared paths instead.
 
    ```bash
    npx skills add Shopify/shopify-ai-toolkit
@@ -66,9 +78,10 @@ Use the bundled initialization guide as the detailed source of truth. At minimum
 - evidence-based structure, build commands, theme conventions, reusable styles/tokens/classes, Liquid and JavaScript patterns, localization, media, dependencies, and testing notes;
 - all common and Shopify rule routes installed by the initializer;
 - local browser routing: in ChatGPT/Codex, the installed Computer Use plugin
-  Skill/MCP tools are mandatory first; built-in Browser, Chrome control, or
-  `.agents/skills/ego-browser/SKILL.md` are fallbacks only after recorded
-  unavailability or an actual call failure;
+  Skill/MCP tools are mandatory first; after recorded unavailability,
+  unsupported operations, or an actual call failure, use Ego Browser, then
+  Playwright CLI if Ego Browser is also unavailable, unsupported, or failing;
+  resolve their Skill paths from the selected local or global layer;
 - remote-write boundaries for Git, Shopify, Basecamp, documents, and other services;
 - project-specific exceptions and a revision log when merging an existing file.
 
@@ -84,11 +97,12 @@ Confirm:
 
 - the dry run reports only `unchanged` items and any intentional conflicts;
 - `AGENTS.md` exists and describes the actual repository;
-- all eight bundled rule files exist in `.agents/rules/`;
-- `.codex`, `.claude`, `.opencode`, and `.omp` configuration files exist;
+- all eight bundled rule files exist in the selected local or global rule layer;
+- the selected client adapter files exist; global files under `clients/` still
+  require integration with the executor and do not prove client activation;
 - `.env` contains the `FIGMA_API_KEY` key without revealing its value;
 - `.gitignore` contains the baseline without losing existing rules;
-- installed Shopify and browser skills exist locally;
+- installed Shopify and browser skills exist at the handoff's selected paths;
 - `git diff --check` passes and `git status --short` contains only expected local changes.
 
 Never run `git push`, publish a Shopify theme, or upload Content Files as part of initialization.

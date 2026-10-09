@@ -1,9 +1,15 @@
 profile:
   id: browser-preview
   # ChatGPT/Codex uses the installed Computer Use plugin first; this profile is
-  # the portable Ego Browser fallback after recorded unavailability or failure.
+  # Ego Browser is the portable fallback; Playwright CLI is next when Ego
+  # Browser is unavailable, unsupported, or fails. Both use this same scope.
   server: ego-browser-cli
   adapter: cli-skill
+  fallbacks:
+    - server: playwright-cli
+      adapter: cli-skill
+      skill: shared/playwright-cli
+      when: ego_browser_unavailable_unsupported_or_failed
   lifecycle: step
   roots: ["${PROJECT_ROOT}"]
   tools:

@@ -22,6 +22,11 @@ enhancement, accessible markup, scoped assets, and viewport validation.
 Before editing a file, classify the change and read every applicable rule file
 from the materialized project layer:
 
+When the handoff declares `global_context`, also obey its applicable global
+rules. If the local `.agents/rules/` layer is absent, resolve the paths below
+through the handoff's explicit global rule paths. Do not modify the global
+layer as part of a theme change.
+
 - new section: `.agents/rules/shopify/new-section-rules.md`
 - copied or adapted section: `.agents/rules/shopify/reuse-section-rules.md`
 - existing section change: `.agents/rules/shopify/modify-section-rules.md`

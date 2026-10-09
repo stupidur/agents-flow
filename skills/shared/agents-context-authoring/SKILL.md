@@ -19,13 +19,23 @@ for a declared remote read or remote write route.
 - Keep the file concise and stable across tasks.
 - Include project structure, verified commands, conventions, testing expectations, and safety boundaries.
 - Reference scoped rule files instead of duplicating their full contents.
+- When the plan declares `global_context`, first read its global `AGENTS.md`
+  and applicable global rules. Add a `全局规则` section to the project
+  `AGENTS.md` that references the actual global paths and retains their
+  constraints. Do not silently weaken global rules with project guidance;
+  follow explicit user instructions and report conflicts. Global rules supply
+  conventions, not evidence of the project's architecture or requirements.
+- Use the plan's explicit global Skill, Rule, memory, and MCP paths when the
+  project-local layer is absent. Read the global layer without modifying it;
+  write the generated project `AGENTS.md` inside the target repository.
 - Record unknowns as unknowns; never guess commands, credentials, branches, stores, or deployment targets.
 - Never include secret values, task-specific requirements, temporary URLs, review findings, or generated-file inventories.
 - Add a short dated revision note when materially updating an existing file.
 - In a Shopify theme, include the sections `项目梳理`, `团队强制规范`, and
   `规则文件匹配`, and preserve the repository's actual paths and conventions.
 - In `规则文件匹配`, point to the materialized `.agents/rules/` files and
-  explain that the relevant rule must be read before the matching change.
+  applicable global rule paths declared by the plan, and explain that the
+  relevant rule must be read before the matching change.
 - If the project contains `.agents/memory/`, document its index and explain that
   memory is contextual guidance only; the active Workflow, `AGENTS.md`, and Rules
   take precedence.

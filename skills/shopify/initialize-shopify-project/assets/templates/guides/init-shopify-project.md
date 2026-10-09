@@ -8,6 +8,12 @@ description: "Shopify 项目初始化指南：生成/更新项目 AGENTS.md，�
 在新仓库、接手主题或重大架构变更后，按本指南生成/更新项目根目录的
 `AGENTS.md`。
 
+如果 handoff 声明 `global_context`，先读取该全局目录的 `AGENTS.md` 和适用
+rules。以下 `.agents/` 路径必须通过 handoff 映射到已安装的全局路径；不要求
+在项目重复复制 rules、skills 或客户端配置。初始化器使用
+`--global-root <global_context.root>`，并在项目 `AGENTS.md` 添加「全局规则」
+小节引用真实路径。全局层只读，项目特例不得静默放宽全局约束。
+
 在执行本指南前，项目内应已安装/复制以下规则文件：
 
 ```text
@@ -28,7 +34,7 @@ description: "Shopify 项目初始化指南：生成/更新项目 AGENTS.md，�
    - **「项目梳理」**：按下方「项目梳理提示」中的要求，结合代码逐条写清（可用表格与文件路径引用）。
    - **「团队强制规范」**：将下方「必须遵守的开发指南」至「实施清单」**全文**并入 `AGENTS.md`（若项目有特例，在文内增加「项目特例」小节说明与下文的差异）。
 3. 若已有 `AGENTS.md`：保留有用历史内容并合并；冲突处增加「修订记录」（日期 + 摘要）。
-4. 在 `AGENTS.md` 中增加 **「规则文件匹配」** 小节，原样写入下列八条：
+4. 在 `AGENTS.md` 中增加 **「规则文件匹配」** 小节，写入下列八条；全局模式使用对应的实际全局路径：
    - **必须** 针对 git 提交及一切可能影响远程仓库的操作时，遵守 **`.agents/rules/common/git-push-restriction-rules.md`**
    - **必须** 用户可见的前端改动及浏览器/响应式验证时，遵守 **`.agents/rules/common/browser-testing-rules.md`**
    - **必须** 新创建 section 时，遵守 **`.agents/rules/shopify/new-section-rules.md`**
@@ -37,7 +43,7 @@ description: "Shopify 项目初始化指南：生成/更新项目 AGENTS.md，�
    - **必须** 涉及 SEO、页面 metadata、结构化数据、标题层级、链接、图片、面包屑或 SEO 相关性能时，遵守 **`.agents/rules/shopify/seo-rules.md`**
    - **必须** 使用图片附件、转换 WebP、上传 Shopify Content Files 或决定 CSS 存放位置时，遵守 **`.agents/rules/shopify/media-asset-rules.md`**
    - **必须** 编写 Shopify 样式、选择全局变量/design token/utility 或断点时，遵守 **`.agents/rules/shopify/theme-style-variable-rules.md`**
-5. 在当前项目目录安装 `ego-browser` 给所有受支持的 Agent：
+5. 验证当前 handoff 选定的浏览器技能；全局层已经提供时不重复安装。需要补充项目技能且初始化包含依赖安装时，可在项目目录安装 `ego-browser`：
 
    ```bash
    npx skills add github:CitroLabs/ego-lite/skills/ego-browser -a '*' -y
@@ -45,8 +51,8 @@ description: "Shopify 项目初始化指南：生成/更新项目 AGENTS.md，�
 
    并在项目 `AGENTS.md` 中明确浏览器工具路由：
    - ChatGPT/Codex 环境必须先加载并使用已安装的 Computer Use 插件 Skill/MCP tools；不得因为内置 Browser、Chrome control 或项目 `ego-browser` 已可见、熟悉或方便就跳过 Computer Use。
-   - 只有 Computer Use 确实不可用，或实际调用失败并记录错误证据后，才允许降级到内置 Browser、Chrome control 或项目 `ego-browser`。
-   - 其他非 GPT Agent 环境必须读取并使用 `.agents/skills/ego-browser/SKILL.md` 执行浏览器交互和测试。
+   - Computer Use 不可用、不支持当前操作或调用失败时，记录证据后使用 Ego Browser；Ego Browser 也不可用、不支持或失败时，使用 Playwright CLI，遵守同一个 `browser-preview` 权限范围。
+   - 非 GPT Agent 从 Ego Browser 开始，必要时回退到 Playwright CLI；技能从 handoff 指定的项目或全局路径读取。
    - 浏览器能力不扩大远端操作授权；发布、上传、提交表单、购买或其它远端写操作仍需遵守工作区审批边界。
 6. 检查项目 MCP 配置已按工作区模板复制：`.codex/config.toml`、`.claude/mcp.json`、`.opencode/opencode.json`、`.omp/config.yml`、`.omp/mcp.json`。
 7. 检查项目 `.env` 已从当前 skill 的 `assets/templates/env/.env` 合并，至少包含 `FIGMA_API_KEY`；不得覆盖已有 `.env`，不得在报告、提交、评论中打印 token。
@@ -55,6 +61,10 @@ description: "Shopify 项目初始化指南：生成/更新项目 AGENTS.md，�
    初始化模板会忽略本地 AgentFlow/client 产物 `.agentflow/`、`.omp/`、`.mcp.json`、`opencode.json`、`.env.example`，以及按当前项目约定作为本地任务产物的 `docs/`、`tests/`。如果项目需要提交正式文档或测试源码，必须先收窄或移除对应忽略项。
 9. 完成后向用户说明 `AGENTS.md` 路径、规则文件所在位置、`.env` 是否存在且含 Figma token（不要输出 token 值）、Claude/Codex/OpenCode/OMP MCP 配置、`.gitignore` 是否更新、Shopify 官方/项目 skills 是否安装（包括 `https://github.com/stupidur/vibe-coding/tree/main/skills/shopify` 下的全部 Shopify skills 和项目级 `ego-browser`），以及后续日常开发要点。
 10. 初始化 `AGENTS.md` 时必须添加「公共记忆」小节，并在项目 `.agents/project.yaml` 的 `context.include` 中包含 `.agents/memory/README.md`、`.agents/memory/global.md`、`.agents/memory/shopify.md`、`.agents/memory/workflows.md` 和 `.agents/memory/integrations.md`。这些文件由 `agentflow bootstrap` 从中央 `memory/` 复制；未知内容保留为空或标记为未知，不得猜测。
+
+全局模式下，第 6、9、10 项改为报告实际全局客户端适配文件、技能和公共记忆
+路径；客户端配置文件存在不代表已经激活。没有项目登记文件时不为记忆引用
+创建额外登记，更不能修改全局 `project.yaml`。保留项目内已存在的配置与记忆。
 
 ---
 

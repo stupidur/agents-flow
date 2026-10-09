@@ -95,7 +95,7 @@ class RuntimeTests(unittest.TestCase):
             self.assertIn("multi-agent tool", workflow)
             self.assertIn("full step contract", workflow)
             self.assertIn("installed Computer Use plugin first", workflow)
-            self.assertIn("fall back to Browser, Chrome control, or `ego-browser`", workflow)
+            self.assertIn("fall back to `ego-browser`, then `playwright-cli`", workflow)
             self.assertIn(".agents/rules/shopify/new-section-rules.md", workflow)
             self.assertIn("Report the completed work", workflow)
             self.assertEqual(json.loads(manifest_path.read_text())["status"], "generated")

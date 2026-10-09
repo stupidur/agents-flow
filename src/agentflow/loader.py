@@ -30,6 +30,8 @@ def find_project_file(start: Path) -> Path | None:
     for directory in (current, *current.parents):
         candidate = directory / ".agents" / "project.yaml"
         if candidate.is_file():
+            if load_yaml(candidate).get("scope") == "global":
+                continue
             return candidate
     return None
 
@@ -73,8 +75,20 @@ def parse_skill(path: Path) -> dict[str, Any]:
 
 
 class AgentFlow:
-    def __init__(self, system_root: Path):
+    def __init__(self, system_root: Path, global_root: Path | None = None):
         self.system_root = system_root.expanduser().resolve()
+        requested_global_root = (global_root or Path(os.environ.get("AGENTFLOW_GLOBAL_ROOT", Path.home() / ".agents"))).expanduser()
+        self.global_root_is_symlink = requested_global_root.is_symlink()
+        self.global_root = requested_global_root.resolve()
+
+    def global_config(self) -> dict[str, Any] | None:
+        path = self.global_root / "project.yaml"
+        if not path.is_file():
+            return None
+        config = load_yaml(path)
+        if config.get("scope") != "global":
+            raise ConfigurationError(f"Global registration must declare scope: global: {path}")
+        return config
 
     def _resolve_source_root(self, configured_root: str) -> Path:
         source_root = Path(configured_root).expanduser()
@@ -89,6 +103,9 @@ class AgentFlow:
             return load_yaml(project_file), self.system_root
         project_file = find_project_file(resolved_project)
         if project_file is None:
+            global_config = self.global_config()
+            if global_config is not None:
+                return global_config, resolved_project
             project_file = self.system_root / "projects" / "default.yaml"
             project_root = project_path.expanduser().resolve()
         else:
@@ -148,6 +165,56 @@ class AgentFlow:
         temporary.replace(destination)
         return {
             "project_root": str(project_root),
+            "project_file": str(destination),
+            "project_id": normalized_id,
+            "project_type": project_type,
+            "replaced": existed,
+        }
+
+    def register_global(
+        self,
+        project_type: str,
+        project_id: str | None = None,
+        *,
+        force: bool = False,
+    ) -> dict[str, Any]:
+        if self.global_root_is_symlink:
+            raise ConfigurationError("Refusing to register through a symlinked global directory")
+        if self.global_root == self.system_root:
+            raise ConfigurationError("The global layer must not overwrite the Agent System source directory")
+        templates = {
+            "default": "default.yaml",
+            "java": "java-project.example.yaml",
+            "shopify": "shopify-project.example.yaml",
+        }
+        if project_type not in templates:
+            raise ConfigurationError(f"Unknown project type: {project_type}")
+        destination = self.global_root / "project.yaml"
+        if self.global_root.exists() and not self.global_root.is_dir():
+            raise ConfigurationError(f"Global directory is not a directory: {self.global_root}")
+        if destination.is_symlink():
+            raise ConfigurationError("Refusing to register through a symlinked global project.yaml")
+        if destination.exists() and not force:
+            raise ConfigurationError(f"Global layer is already registered: {destination}")
+        if destination.exists() and not destination.is_file():
+            raise ConfigurationError(f"Global registration is not a file: {destination}")
+        config = load_yaml(self.system_root / "projects" / templates[project_type])
+        normalized_id = re.sub(r"[^a-z0-9-]+", "-", (project_id or f"global-{project_type}").lower()).strip("-")
+        if not normalized_id:
+            raise ConfigurationError("Project id must contain a letter or number")
+        config["scope"] = "global"
+        config["system_root"] = str(self.system_root)
+        config["project"]["id"] = normalized_id
+        config["context"]["include"] = ["AGENTS.md", "project.yaml", "rules/**", "memory/**"]
+        existed = destination.exists()
+        self.global_root.mkdir(parents=True, exist_ok=True)
+        with tempfile.NamedTemporaryFile("w", encoding="utf-8", dir=self.global_root, delete=False) as handle:
+            yaml.safe_dump(config, handle, sort_keys=False, allow_unicode=True)
+            temporary = Path(handle.name)
+        temporary.replace(destination)
+        return {
+            "scope": "global",
+            "global_root": str(self.global_root),
             "project_file": str(destination),
             "project_id": normalized_id,
             "project_type": project_type,
@@ -675,7 +742,64 @@ class AgentFlow:
 
     def plan(self, workflow_id: str, project_path: Path, flags: dict[str, Any] | None = None) -> dict[str, Any]:
         project, project_root = self.load_project(project_path)
-        return self._build_plan(workflow_id, project, project_root, flags or {})
+        if project_root == self.global_root:
+            raise ConfigurationError("The global layer is not a task project; select a repository with --project")
+        plan = self._build_plan(workflow_id, project, project_root, flags or {})
+        if self.global_config() is None:
+            return plan
+        global_rules = [str(path) for path in sorted((self.global_root / "rules").rglob("*.md")) if path.is_file()]
+        plan["global_context"] = {
+            "root": str(self.global_root),
+            "agents_md": str(self.global_root / "AGENTS.md"),
+            "rules": global_rules,
+            "memory_index": str(self.global_root / "memory/README.md"),
+            "agent_files": {
+                step["agent"]: str(self.global_root / "agents" / f"{step['agent']}.yaml")
+                for step in plan["steps"]
+            },
+            "access": "read-only",
+        }
+
+        def resolve_rule(value: str) -> str:
+            path = Path(value)
+            try:
+                relative = path.relative_to(self.system_root / "rules")
+            except ValueError:
+                return value
+            local = project_root / ".agents" / "rules" / relative
+            shared = self.global_root / "rules" / relative
+            return str(local) if local.is_file() else str(shared) if shared.is_file() else value
+
+        sources = list(plan.get("executor_skill_sources", []))
+        for step in plan["steps"]:
+            sources.extend(step["skill_sources"])
+            local_agent = project_root / ".agents/agents" / f"{step['agent']}.yaml"
+            step["agent_file"] = str(local_agent) if local_agent.is_file() else plan["global_context"]["agent_files"][step["agent"]]
+            step["rules"] = sorted({*(resolve_rule(rule) for rule in step["rules"]), *global_rules})
+            step["mcp_profile_files"] = {
+                profile: str(project_root / ".agents/mcp/profiles" / f"{profile}.yaml")
+                if (project_root / ".agents/mcp/profiles" / f"{profile}.yaml").is_file()
+                else str(self.global_root / "mcp/profiles" / f"{profile}.yaml")
+                for profile in step["mcp_profiles"]
+            }
+        for source in sources:
+            source["rules"] = [resolve_rule(rule) for rule in source["rules"]]
+            local = project_root / source["path"]
+            shared = self.global_root / "skills" / source["id"].split("/", 1)[1] / "SKILL.md"
+            if not local.is_file() and shared.is_file():
+                original_dir = Path(source["source_path"]).parent
+                source["execution_path"] = str(shared)
+                source["path"] = str(shared)
+                source["source_path"] = str(shared)
+                for field in ("references", "scripts"):
+                    rebased = []
+                    for value in source[field]:
+                        try:
+                            rebased.append(str(shared.parent / Path(value).relative_to(original_dir)))
+                        except ValueError:
+                            rebased.append(value)
+                    source[field] = rebased
+        return plan
 
     def validate(self) -> list[str]:
         errors: list[str] = []

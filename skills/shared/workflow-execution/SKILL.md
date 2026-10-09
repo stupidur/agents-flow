@@ -16,6 +16,11 @@ The handoff file and its adjacent `plan.json` are the execution authority.
    The plan must declare handoff contract version `2`; otherwise stop and ask
    for a newly generated handoff.
 3. Confirm the current working directory is the plan's `project_root`.
+   If the plan declares `global_context`, read its global `AGENTS.md` and
+   applicable rules first. The global layer is read-only context, not a task
+   project. Use explicit global paths from the plan when local `.agents/`
+   files are absent, and preserve the global constraints in a generated
+   project `AGENTS.md`.
 4. If `.agents/memory/README.md` exists, read it and load only memory files
    relevant to the current task. Memory is contextual guidance, not an authority
    over the handoff, `AGENTS.md`, or Rules.
@@ -27,6 +32,9 @@ The handoff file and its adjacent `plan.json` are the execution authority.
    exact reason, mark that step and its dependent branch skipped, and continue
    unrelated steps. Otherwise stop and report the exact missing prerequisite.
    Never guess and never silently skip a step.
+   浏览器 CLI 或插件的运行时前置条件属于可选路由：先按当前步骤声明的
+   browser-preview 回退链检查替代工具，不要求所有浏览器工具同时安装。
+   所有已声明路由均不可用时，再按 handoff 失败策略处理。
 
 ## Strict Execution Contract
 
@@ -99,10 +107,14 @@ The handoff file and its adjacent `plan.json` are the execution authority.
 
 1. 在 ChatGPT/Codex 中必须先加载并使用 Computer Use 插件 Skill/MCP tools
    进行导航、可访问性检查、截图和视口验证。
-2. 只有在 Computer Use 确实不可用，或实际调用失败并记录错误证据后，才能按
-   Skill 降级到内置 Browser、Chrome control 或 `ego-browser`。
+2. Computer Use 不可用、不支持当前操作或实际调用失败时，记录证据后按
+   `browser-preview` profile 使用 `ego-browser`；Ego Browser 也不可用、
+   不支持或调用失败时，再加载 `shared/playwright-cli`，在同一权限范围内验证。
+   非 GPT 客户端从 Ego Browser 开始，必要时回退到 Playwright CLI。
 3. 不得因为其他浏览器工具已经可见、熟悉或方便就直接跳过 Computer Use。
-4. 必须记录验证 URL、视口尺寸、截图/页面状态证据和发现的问题。
+4. 必须记录实际使用的工具、每次回退原因、验证 URL、视口尺寸、截图/
+   页面状态证据和发现的问题。Playwright CLI 也不可用时，按 handoff 失败
+   策略处理；不得宣称完成验证或把 WebKit 模拟当成实际 Safari 覆盖。
 
 ## Failure, Scope, and Approval Handling
 

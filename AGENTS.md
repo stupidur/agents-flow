@@ -10,6 +10,13 @@ Keep the global context minimal. For work in this repository:
 6. Treat all networked tools as read-only unless a step explicitly requires approval.
 7. Close step-scoped MCP connections before advancing to the next step.
 
+`register` and `bootstrap` default to the current project; `--global` installs
+the shared layer in `~/.agents/` (or `--global-root`). When a plan declares
+`global_context`, read its global `AGENTS.md` and applicable rules, preserve
+those constraints in generated project `AGENTS.md`, and keep global files
+read-only during task execution. A global layer never becomes the task's
+project root or expands a locally registered project's permissions.
+
 ## Browser and desktop UI routing
 
 When the executor is ChatGPT or Codex and the Computer Use plugin is installed
@@ -20,9 +27,13 @@ or `ego-browser` merely because it is already visible or familiar.
 
 Before declaring Computer Use unavailable, load its installed Skill and search
 the delayed tool catalog for its server/tools. Fall back to the built-in
-Browser, Chrome control, or `ego-browser` only after Computer Use is genuinely
-unavailable or an actual Computer Use call fails; record that evidence in the
-task result. In non-GPT clients, use the workflow-declared portable fallback.
+`ego-browser` only after Computer Use is genuinely unavailable, unsupported
+for the required operation, or an actual Computer Use call fails; record that
+evidence in the task result. If Ego Browser is also unavailable, unsupported,
+or fails, use the workflow-declared `playwright-cli` Skill under the same
+`browser-preview` scope. Non-GPT clients start with Ego Browser and use
+Playwright CLI as its fallback. These CLI fallbacks cover browser validation,
+not native desktop app control.
 This routing preference does not expand permission for remote writes or other
 sensitive actions.
 

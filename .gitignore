@@ -1,6 +1,8 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.agentflow/
+.playwright-cli/
 .coverage
 htmlcov/
 .venv/

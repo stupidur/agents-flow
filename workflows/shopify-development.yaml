@@ -86,7 +86,7 @@ steps:
         required: true
   - id: visual_validation
     agent: shopify-developer
-    skills: [shared/codex-computer-use, shared/ego-browser, shared/code-review]
+    skills: [shared/codex-computer-use, shared/ego-browser, shared/playwright-cli, shared/code-review]
     capabilities: [code_read, document_write, browser_preview]
     mcp: [project-files-workspace-write, browser-preview]
     inputs_from:

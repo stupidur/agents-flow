@@ -88,6 +88,10 @@ skills:
     source: local
     path: skills/shared/codex-computer-use/SKILL.md
     bucket: LIBRARY
+  shared/playwright-cli:
+    source: local
+    path: skills/shared/playwright-cli/SKILL.md
+    bucket: LIBRARY
   java/feature-implementation:
     source: local
     path: skills/java/feature-implementation/SKILL.md

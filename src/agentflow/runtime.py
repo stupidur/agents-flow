@@ -72,8 +72,10 @@ def _relative_to_project(path: Path, project_root: Path) -> str:
         return str(path)
 
 
-def _portable_dependency_path(value: str) -> str:
+def _portable_dependency_path(value: str, global_root: str | None = None) -> str:
     path = Path(value)
+    if global_root and path.is_absolute() and path.is_relative_to(Path(global_root)):
+        return value
     parts = path.parts
     for marker, prefix in (("rules", ".agents/rules"), ("references", ".agents/references")):
         if marker in parts:
@@ -81,6 +83,23 @@ def _portable_dependency_path(value: str) -> str:
             suffix = Path(*parts[index + 1:]) if index + 1 < len(parts) else Path()
             return str(Path(prefix) / suffix)
     return value
+
+
+def _global_context_text(plan: dict[str, Any]) -> str:
+    context = plan.get("global_context")
+    if not context:
+        return ""
+    return (
+        f"Read the global instructions `{context['agents_md']}` before acting. "
+        f"The shared layer `{context['root']}` is read-only task context; it is not the project root. "
+        f"Use the global memory index `{context['memory_index']}` only for task-relevant context. "
+        "Read and obey applicable global rules alongside project rules; do not silently weaken them. "
+        "If instructions conflict, follow explicit user instructions and report the conflict. "
+        "When creating or updating project AGENTS.md, include a global-rules section referencing "
+        "the global instructions and applicable rule paths. Keep task requirements evidence-based "
+        "and all task writes inside the target project. Resolve .agents/ paths in Skills through "
+        "the plan's explicit global Skill, Rule, memory, and MCP file paths when the local layer is absent."
+    )
 
 
 def _materialize_task_paths(value: Any, task_id: str) -> Any:
@@ -117,7 +136,7 @@ def build_execution_prompt(plan: dict[str, Any], task_prompt: str, plan_path: Pa
     step_lines = []
     for index, step in enumerate(steps, start=1):
         skills = ", ".join(step.get("skills", [])) or "none"
-        rules = ", ".join(_portable_dependency_path(rule) for rule in step.get("rules", [])) or "none"
+        rules = ", ".join(_portable_dependency_path(rule, plan.get("global_context", {}).get("root")) for rule in step.get("rules", [])) or "none"
         mcp_profiles = ", ".join(step.get("mcp_profiles", [])) or "none"
         outputs = _output_contract_text(step.get("outputs", []))
         inputs_from = _input_contract_text(step.get("inputs_from", []))
@@ -174,6 +193,8 @@ than treating the rule list as background context.
 Selected steps:
 {steps_text}
 
+{_global_context_text(plan)}
+
 Execution requirements:
 - Keep all file changes inside the target project.
 - Dispatch each step to its listed Agent ID through the client's multi-agent tool;
@@ -198,8 +219,11 @@ Execution requirements:
 - For each remote-read route, use exactly the declared Skill/command or MCP profile;
   never switch routes.
 - In ChatGPT/Codex, use the installed Computer Use plugin first for browser and
-  desktop UI interaction. Record unavailability or actual call failure before
-  falling back to the built-in Browser, Chrome control, or `ego-browser`.
+  desktop UI interaction. Record unavailability, unsupported operations, or actual
+  call failure before falling back to `ego-browser`; if Ego Browser is also
+  unavailable, unsupported, or fails, use `playwright-cli` under the same
+  browser-preview profile. Non-GPT clients start with Ego Browser. Browser CLI
+  fallbacks do not replace native desktop control or expand remote-write permissions.
 - For steps sharing a `parallel_group`, use independent subagents only when that
   is supported by the current client; otherwise execute them independently and
   merge their findings before continuing.
@@ -243,7 +267,7 @@ def build_workflow_markdown(plan: dict[str, Any], task_prompt: str, plan_path: P
         "- Do not start a step until every `requires_gates` entry has passed. A failed gate with `on_failure: skip_dependents` skips only its dependent branch and records the reason; other failures stop the workflow.",
         "- Follow each `source_policy`; `artifact-only` forbids substitution from local specs, branch names, filenames, or assumptions.",
         "- For remote reads with `on_unavailable: skip_dependents`, write the declared unavailable/status artifact, skip only dependent steps, and continue independent steps without changing the route.",
-        "- In ChatGPT/Codex, use the installed Computer Use plugin first for browser or desktop UI interaction; fall back to Browser, Chrome control, or `ego-browser` only after recorded unavailability or an actual call failure.",
+        "- In ChatGPT/Codex, use the installed Computer Use plugin first for browser or desktop UI interaction; after recorded unavailability, unsupported operations, or an actual call failure, fall back to `ego-browser`, then `playwright-cli` if Ego Browser is also unavailable, unsupported, or fails, under the same browser-preview profile. Non-GPT clients start with Ego Browser. Browser CLI fallbacks do not replace native desktop control or expand remote-write permissions.",
         "- Respect every approval requirement and ask before the marked write operation.",
         "- Keep changes inside the target project; do not push, merge, publish, or deploy unless explicitly requested.",
         "- Run relevant tests after implementation steps.",
@@ -262,8 +286,11 @@ def build_workflow_markdown(plan: dict[str, Any], task_prompt: str, plan_path: P
 
     executor_skills = plan.get("executor_skills", [])
     if executor_skills:
+        executor_sources = {source["id"]: source for source in plan.get("executor_skill_sources", [])}
         for skill in executor_skills:
-            lines.append(f"- `.agents/skills/{str(skill).split('/', 1)[-1]}/SKILL.md`")
+            source = executor_sources.get(skill, {})
+            path = source.get("execution_path", f".agents/skills/{str(skill).split('/', 1)[-1]}/SKILL.md")
+            lines.append(f"- `{path}`")
     else:
         lines.append("- none")
     lines.extend([
@@ -280,6 +307,8 @@ def build_workflow_markdown(plan: dict[str, Any], task_prompt: str, plan_path: P
     chain = plan.get("workflow_chain", [])
     if chain:
         lines.extend(["", "## Workflow Chain", "", f"`{' → '.join(chain)}`"])
+    if plan.get("global_context"):
+        lines.extend(["", "## Global Rules", "", _global_context_text(plan), ""])
     lines.extend([
         "",
         "## Outputs",
@@ -306,11 +335,14 @@ def build_workflow_markdown(plan: dict[str, Any], task_prompt: str, plan_path: P
             f"- Parallel group: `{step['parallel_group']}`" if step.get("parallel_group") else "- Parallel group: none",
             f"- Approval: {'required' if step.get('approval_required') else 'not separately required'}",
         ])
+        if step.get("agent_file"):
+            lines.append(f"- Agent file: `{step['agent_file']}`")
         for source in step.get("skill_sources", []):
             skill_name = str(source["id"]).split("/", 1)[-1]
             execution_path = source.get("execution_path", f".agents/skills/{skill_name}/SKILL.md")
-            lines.append(f"- Skill file: `{execution_path}` (materialized project path)")
-        rules = [_portable_dependency_path(rule) for rule in step.get("rules", [])]
+            path_scope = "global shared path" if Path(execution_path).is_absolute() else "materialized project path"
+            lines.append(f"- Skill file: `{execution_path}` ({path_scope})")
+        rules = [_portable_dependency_path(rule, plan.get("global_context", {}).get("root")) for rule in step.get("rules", [])]
         lines.append(f"- Rules (must read before matching changes): {', '.join(f'`{rule}`' for rule in rules) or 'none'}")
         outputs = step.get("outputs", [])
         lines.append(f"- Outputs (must produce before completing step): {_output_contract_text(outputs)}")
@@ -345,7 +377,8 @@ def build_workflow_markdown(plan: dict[str, Any], task_prompt: str, plan_path: P
                     f"on unavailable: `{remote_read.get('on_unavailable', 'stop')}`"
                 )
         for profile in step.get("mcp_profiles", []):
-            lines.append(f"- MCP profile file: `.agents/mcp/profiles/{profile}.yaml`")
+            profile_path = step.get("mcp_profile_files", {}).get(profile, f".agents/mcp/profiles/{profile}.yaml")
+            lines.append(f"- MCP profile file: `{profile_path}`")
         lines.append("")
 
     if not plan.get("steps"):

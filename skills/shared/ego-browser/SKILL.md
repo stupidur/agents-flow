@@ -14,6 +14,11 @@ metadata:
 
 Use Ego Browser as the portable browser adapter. It is a CLI Skill, not an MCP server, so every client can invoke it through its shell tool without depending on a proprietary browser plugin.
 
+If Ego Browser is unavailable, does not support the required validation, or an
+actual scoped call fails, record the evidence and load `shared/playwright-cli`
+under the same `browser-preview` profile. This is an explicitly declared
+fallback; do not treat the failed Ego Browser route as a passed validation.
+
 ## Required pattern
 
 Run browser operations with the installed `ego-browser` CLI and an inline Node.js program. Reuse one named task space throughout a user task:
