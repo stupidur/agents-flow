@@ -1,0 +1,31 @@
+# Agent / local workflow artifacts
+.agentflow/
+.codex/
+.claude/
+.cursor/
+.windsurf/
+.augment/
+.trae/
+.aider*
+.agents/
+/agent/
+.omp/
+.opencode/
+AGENTS.md
+skills-lock.json
+opencode.json
+.mcp.json
+docs/
+tests/
+
+# Environment and local logs
+.env
+.env.*
+.env.example
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# macOS
+.DS_Store

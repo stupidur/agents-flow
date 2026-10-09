@@ -1,0 +1,51 @@
+workflow:
+  id: code-review
+  version: 1
+  executor_skills: [shared/workflow-execution]
+  allowed_capabilities: [code_read, project_read, document_write, test_run, github_read]
+steps:
+  - id: minimax_review
+    agent: minimax_code_reviewer
+    parallel_group: independent_reviews
+    skills: [shared/code-review]
+    capabilities: [code_read]
+    mcp: [project-files]
+    outputs:
+      - id: minimax_findings
+        transport: agent_result
+        format: json
+        required: true
+  - id: deepseek_review
+    agent: ds_code_reviewer
+    parallel_group: independent_reviews
+    skills: [shared/code-review]
+    capabilities: [code_read]
+    mcp: [project-files]
+    outputs:
+      - id: deepseek_findings
+        transport: agent_result
+        format: json
+        required: true
+  - id: aggregate_findings
+    agent: coordinator
+    skills: [shared/review-aggregation]
+    capabilities: [project_read, document_write]
+    mcp: [project-files-workspace-write]
+    inputs_from:
+      - step: minimax_review
+        artifact: minimax_findings
+        required: true
+      - step: deepseek_review
+        artifact: deepseek_findings
+        required: true
+    outputs:
+      - id: review
+        path: .agentflow/runs/<task-id>/review.json
+        format: json
+        schema: review-findings-v1
+        required: true
+output:
+  schema: review-findings-v1
+  artifacts:
+    review: ".agentflow/runs/<task-id>/review.json"
+  requires_human_approval: false

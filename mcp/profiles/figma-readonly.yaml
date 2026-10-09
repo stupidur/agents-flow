@@ -1,0 +1,8 @@
+profile:
+  id: figma-readonly
+  server: figma
+  lifecycle: step
+  tools:
+    allow: [get_file_metadata, get_design_context, get_images, get_variables]
+    deny: [create_file, update_file, publish_library, delete_node]
+

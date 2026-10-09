@@ -1,0 +1,23 @@
+capability_providers:
+  code_read:
+    local: project-files
+  code_write:
+    local: project-files-workspace-write
+  project_read:
+    local: project-files
+  project_write:
+    local: project-files-workspace-write
+  github_read:
+    default: github-readonly
+  web_read:
+    default: public-web-search
+  browser_preview:
+    default: browser-preview
+  figma_read:
+    default: figma-readonly
+  shopify_read:
+    default: shopify-dev-mcp
+  basecamp_read:
+    default: basecamp-readonly
+  shopify_docs_read:
+    default: shopify-dev-mcp

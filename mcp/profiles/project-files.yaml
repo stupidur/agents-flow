@@ -1,0 +1,10 @@
+profile:
+  id: project-files
+  server: builtin-local
+  lifecycle: step
+  roots: ["${PROJECT_ROOT}"]
+  tools:
+    allow: [search_files, read_file, list_directory]
+    deny: [read_parent, write_file, delete_file]
+  deny_paths: [../, .git/**, .env*, ~/.ssh/**, ~/.aws/**, ~/.config/**]
+

@@ -1,0 +1,7 @@
+profile:
+  id: basecamp-readonly
+  server: basecamp
+  lifecycle: step
+  tools:
+    allow: [list_projects, read_todos, read_cards, read_messages, read_documents, read_files, read_schedule, read_checkins]
+    deny: [create_todo, update_todo, create_message, create_card, upload_file, delete_recording]

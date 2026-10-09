@@ -1,0 +1,17 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agentflow-local"
+version = "0.1.0"
+description = "Directory-aware Agent, Skill, Workflow, and MCP profile resolver"
+requires-python = ">=3.11"
+dependencies = ["PyYAML>=6.0"]
+
+[project.scripts]
+agentflow = "agentflow.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+

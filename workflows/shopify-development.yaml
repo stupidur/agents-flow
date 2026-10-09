@@ -1,0 +1,108 @@
+workflow:
+  id: shopify-development
+  version: 1
+  executor_skills: [shared/workflow-execution]
+  required_inputs:
+    source_design: nonempty
+  allowed_capabilities: [figma_read, code_read, code_write, document_write, test_run, browser_preview, shopify_read, shopify_docs_read, github_read]
+steps:
+  - id: inspect_theme
+    agent: shopify-developer
+    skills: [shopify/theme-investigation]
+    capabilities: [code_read]
+    mcp: [project-files]
+    outputs:
+      - id: theme_context
+        transport: agent_result
+        format: json
+        required: true
+  - id: inspect_shopify_platform
+    agent: shopify-developer
+    skills: [shopify/shopify-dev]
+    capabilities: [shopify_docs_read]
+    mcp: [shopify-dev-mcp]
+    outputs:
+      - id: shopify_platform_context
+        transport: agent_result
+        format: json
+        required: true
+    when: {shopify_docs_required: true}
+  - id: inspect_figma
+    agent: shopify-developer
+    skills: [shopify/figma-to-shopify]
+    capabilities: [figma_read, code_read]
+    required_inputs:
+      figma_desktop_url: nonempty
+      figma_mobile_url: nonempty
+      supplemental_details_confirmed: true
+    mcp: [figma-readonly, project-files]
+    outputs:
+      - id: figma_context
+        transport: agent_result
+        format: json
+        required: true
+    when: {source_design: figma}
+  - id: inspect_repository_context
+    agent: shopify-developer
+    skills: [shared/github-context-readonly]
+    capabilities: [code_read, github_read]
+    mcp: []
+    remote_read:
+      type: skill
+      skill: shared/github-context-readonly
+      command: gh
+    outputs:
+      - id: github_context
+        transport: agent_result
+        format: json
+        required: true
+    when: {repository_is_remote: true}
+  - id: implement_theme
+    agent: shopify-developer
+    skills: [shopify/theme-implementation]
+    capabilities: [code_read, code_write, document_write, test_run]
+    mcp: [project-files-workspace-write]
+    inputs_from:
+      - step: inspect_theme
+        artifact: theme_context
+        required: true
+      - step: inspect_shopify_platform
+        artifact: shopify_platform_context
+        required: true
+        when: {shopify_docs_required: true}
+      - step: inspect_figma
+        artifact: figma_context
+        required: true
+        when: {source_design: figma}
+      - step: inspect_repository_context
+        artifact: github_context
+        required: true
+        when: {repository_is_remote: true}
+    outputs:
+      - id: implementation
+        path: .agentflow/runs/<task-id>/implementation.json
+        format: json
+        schema: shopify-development-result-v1
+        required: true
+  - id: visual_validation
+    agent: shopify-developer
+    skills: [shared/codex-computer-use, shared/ego-browser, shared/code-review]
+    capabilities: [code_read, document_write, browser_preview]
+    mcp: [project-files-workspace-write, browser-preview]
+    inputs_from:
+      - step: implement_theme
+        artifact: implementation
+        required: true
+    outputs:
+      - id: visual_validation
+        path: .agentflow/runs/<task-id>/visual-validation.json
+        format: json
+        schema: visual-validation-v1
+        required: true
+    when: {visual_validation_required: true}
+output:
+  schema: shopify-development-result-v1
+  artifacts:
+    implementation: ".agentflow/runs/<task-id>/implementation.json"
+    visual_validation: ".agentflow/runs/<task-id>/visual-validation.json"
+  requires_human_approval: false

@@ -1,0 +1,7 @@
+agent:
+  id: shopify-developer
+  role: Investigate and implement Shopify theme or app changes safely.
+  model: gpt-5.6-luna
+  model_reasoning_effort: high
+  model_tier: high
+  allowed_capabilities: [figma_read, code_read, code_write, document_write, test_run, github_read, shopify_read, shopify_docs_read, browser_preview, web_read]

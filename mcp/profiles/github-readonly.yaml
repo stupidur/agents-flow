@@ -1,0 +1,8 @@
+profile:
+  id: github-readonly
+  server: github
+  lifecycle: step
+  tools:
+    allow: [search_repositories, search_code, read_file, get_pull_request, list_issues]
+    deny: [create_branch, push_files, merge_pull_request, delete_file]
+

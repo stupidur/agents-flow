@@ -1,0 +1,36 @@
+workflow:
+  id: basecamp-task
+  version: 1
+  required_inputs:
+    basecamp_task_url: nonempty
+    source_design: nonempty
+  allowed_capabilities: [requirement_analysis, project_read, document_write, basecamp_read, figma_read, code_read, code_write, test_run, browser_preview, shopify_read, shopify_docs_read, github_read]
+  executor_skills: [shared/workflow-execution]
+  chain:
+    - workflow: product-spec
+      set:
+        requirements_source: basecamp
+    - workflow: shopify-development
+      target_step: implement_theme
+      inputs_from:
+        - workflow: product-spec
+          step: acceptance_criteria
+          artifact: specification
+          required: true
+        - workflow: product-spec
+          step: verify_specification_source
+          artifact: specification_verification
+          required: true
+      requires_gates:
+        - workflow: product-spec
+          gate: specification_source_consistency
+output:
+  schema: basecamp-task-v1
+  artifacts:
+    basecamp_context: ".agentflow/workflows/<task-id>/basecamp-context.json"
+    requirements_evidence: ".agentflow/workflows/<task-id>/requirements-extracted.json"
+    source_verification: ".agentflow/workflows/<task-id>/basecamp-source-verification.json"
+    specification_verification: ".agentflow/workflows/<task-id>/specification-verification.json"
+    specification: "docs/specs/<task-id>.md"
+    implementation: ".agentflow/runs/<task-id>/implementation.json"
+  requires_human_approval: false

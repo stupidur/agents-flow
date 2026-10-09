@@ -1,0 +1,5 @@
+interface:
+  display_name: "Figma to Shopify"
+  short_description: "Turn Figma designs into Shopify theme sections"
+  default_prompt: "Use $figma-to-shopify to implement this Figma design in the current Shopify theme."
+

@@ -1,0 +1,4 @@
+interface:
+  display_name: "AGENTS Context Authoring"
+  short_description: "Create or refresh evidence-based AGENTS.md context"
+  default_prompt: "Use $agents-context-authoring to create or update AGENTS.md from verified repository evidence."

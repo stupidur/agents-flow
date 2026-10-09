@@ -1,0 +1,29 @@
+
+{
+  "$schema": "https://raw.githubusercontent.com/can1357/oh-my-pi/main/packages/coding-agent/src/config/mcp-schema.json",
+  "mcpServers": {
+    "shopify-dev-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@shopify/dev-mcp@latest"
+      ],
+      "enabled": true
+    },
+    "figma-developer-mcp": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y",
+        "figma-developer-mcp",
+        "--stdio"
+      ],
+      "enabled": true
+    },
+    "figma-desktop-mcp": {
+      "type": "http",
+      "url": "http://127.0.0.1:3845/mcp",
+      "enabled": true
+    }
+  }
+}

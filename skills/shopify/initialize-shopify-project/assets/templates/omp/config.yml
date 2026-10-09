@@ -1,0 +1,8 @@
+# Project-level OMP settings template for Shopify theme repositories.
+# Copy this file to <project>/.omp/config.yml during project initialization.
+#
+# MCP servers are configured in .omp/mcp.json, not in this settings file.
+# Keep this file minimal so project setup does not override user-level OMP
+# preferences such as model routing, themes, or disabled provider lists.
+
+setupVersion: 1

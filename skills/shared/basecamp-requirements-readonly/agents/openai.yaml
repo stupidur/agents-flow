@@ -1,0 +1,4 @@
+interface:
+  display_name: "Basecamp Requirements Read-only"
+  short_description: "Read Basecamp task context without remote changes"
+  default_prompt: "Use $basecamp-requirements-readonly to read Basecamp requirements without changing remote data."

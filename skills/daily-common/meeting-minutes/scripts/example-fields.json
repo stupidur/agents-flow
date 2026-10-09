@@ -1,0 +1,11 @@
+{
+  "project_name": "Acme科技",
+  "interview_purpose": "了解业务现状与合作意向",
+  "interview_time": "2026年5月29日",
+  "interview_location": "线上视频会议",
+  "participants": "张三（客户）/ zhang@example.com\n李四（我方）/ li@example.com",
+  "topics": "1. 产品规划\n2. 交付周期\n3. 预算范围",
+  "interview_notes": "客户关注交付周期与售后响应速度，希望 Q3 前完成试点。",
+  "interview_results": "达成初步合作意向，待提供试用环境后推进 POC。",
+  "interviewee_suggestions": "希望提供试用环境与实施案例文档。"
+}

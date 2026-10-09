@@ -1,0 +1,8 @@
+profile:
+  id: public-web-search
+  server: web-search
+  lifecycle: step
+  tools:
+    allow: [search, open]
+    deny: [submit, upload]
+

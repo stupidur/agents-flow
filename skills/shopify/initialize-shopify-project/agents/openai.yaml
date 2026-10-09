@@ -1,0 +1,4 @@
+interface:
+  display_name: "Initialize Shopify Project"
+  short_description: "Bootstrap a Shopify repository with shared agent capabilities"
+  default_prompt: "Use $initialize-shopify-project to initialize this Shopify project with the standard agent rules and tool configurations."

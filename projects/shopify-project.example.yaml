@@ -1,0 +1,15 @@
+project:
+  id: replace-with-shopify-project-id
+  domain: shopify
+agent_profile:
+  default: shopify-developer
+allowed_workflows: [project-onboarding, shopify-project-onboarding, basecamp-task, product-spec, shopify-development, code-review]
+skill_namespaces:
+  allow: [shared, shopify]
+  deny: [java]
+mcp_profiles:
+  default: [project-files]
+  optional: [project-files-workspace-write, github-readonly, public-web-search, browser-preview, figma-readonly, basecamp-readonly, shopify-dev-mcp]
+context:
+  include: [README.md, AGENTS.md, .agents/project.yaml, .agents/rules/**, .agents/memory/README.md, .agents/memory/global.md, .agents/memory/shopify.md, .agents/memory/workflows.md, .agents/memory/integrations.md]
+  exclude: [.git/**, node_modules/**, assets/*.map]

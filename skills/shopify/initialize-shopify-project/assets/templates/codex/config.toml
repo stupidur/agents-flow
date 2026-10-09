@@ -1,0 +1,7 @@
+# Project-level Codex config template for Shopify theme repositories.
+# Copy this file to <project>/.codex/config.toml during project initialization.
+
+[mcp_servers.shopify-dev-mcp]
+type = "stdio"
+command = "npx"
+args = [ "-y", "@shopify/dev-mcp@latest" ]

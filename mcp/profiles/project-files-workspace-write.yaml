@@ -1,0 +1,9 @@
+profile:
+  id: project-files-workspace-write
+  server: builtin-local
+  lifecycle: step
+  roots: ["${PROJECT_ROOT}"]
+  tools:
+    allow: [search_files, read_file, list_directory, create_file, write_file]
+    deny: [read_parent, delete_file, move_file]
+  deny_paths: [../, .git/**, .env*, ~/.ssh/**, ~/.aws/**, ~/.config/**]

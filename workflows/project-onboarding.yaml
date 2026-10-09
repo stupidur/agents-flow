@@ -1,0 +1,42 @@
+workflow:
+  id: project-onboarding
+  version: 1
+  executor_skills: [shared/workflow-execution]
+  allowed_capabilities: [project_read, document_write]
+steps:
+  - id: discover_project
+    agent: requirement-analyst
+    model_tier: medium
+    skills: [shared/project-discovery]
+    capabilities: [project_read, document_write]
+    outputs:
+      - id: project_map
+        path: .agentflow/workflows/<task-id>/project-map.json
+        format: json
+        schema: project-map-v1
+        required: true
+  - id: author_agents_context
+    agent: requirement-analyst
+    model_tier: medium
+    skills: [shared/agents-context-authoring]
+    capabilities: [project_read, document_write]
+    inputs_from:
+      - step: discover_project
+        artifact: project_map
+        required: true
+    source_policy:
+      mode: artifact-only
+      source_step: discover_project
+      source_artifact: project_map
+      on_missing: stop
+    outputs:
+      - id: project_context
+        path: AGENTS.md
+        format: markdown
+        required: true
+output:
+  schema: project-onboarding-v1
+  artifacts:
+    project_context: AGENTS.md
+    project_memory: .agents/memory/**
+  requires_human_approval: false

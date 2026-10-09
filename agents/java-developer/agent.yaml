@@ -1,0 +1,5 @@
+agent:
+  id: java-developer
+  role: Investigate, implement, and test Java changes inside the project boundary.
+  model_tier: medium
+  allowed_capabilities: [code_read, code_write, document_write, test_run, github_read, database_read, web_read]

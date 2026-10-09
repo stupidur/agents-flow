@@ -1,0 +1,22 @@
+project:
+  id: agent-system
+  domain: agent-system
+agent_profile:
+  default: coordinator
+allowed_workflows:
+  - project-onboarding
+  - shopify-project-onboarding
+  - basecamp-task
+  - product-spec
+  - java-feature
+  - shopify-development
+  - code-review
+skill_namespaces:
+  allow: [shared, daily-common, java, shopify]
+  deny: []
+mcp_profiles:
+  default: [project-files]
+  optional: [project-files-workspace-write, github-readonly, public-web-search, browser-preview, figma-readonly, basecamp-readonly, shopify-dev-mcp]
+context:
+  include: [README.md, AGENTS.md, rules/agent-system.md, memory/**]
+  exclude: [.git/**, .venv/**, __pycache__/**, dist/**]

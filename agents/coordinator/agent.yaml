@@ -1,0 +1,5 @@
+agent:
+  id: coordinator
+  role: Select a project-safe workflow and coordinate handoffs.
+  model_tier: small
+  allowed_capabilities: [project_read, document_write, workflow_selection]

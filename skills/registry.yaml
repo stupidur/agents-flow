@@ -1,0 +1,147 @@
+sources:
+  local:
+    root: .
+
+skills:
+  shared/project-discovery:
+    source: local
+    path: skills/shared/project-discovery/SKILL.md
+    bucket: LIBRARY
+  shared/workflow-execution:
+    source: local
+    path: skills/shared/workflow-execution/SKILL.md
+    bucket: LIBRARY
+  shared/agents-context-authoring:
+    source: local
+    path: skills/shared/agents-context-authoring/SKILL.md
+    bucket: LIBRARY
+  shared/basecamp-requirements-readonly:
+    source: local
+    path: skills/shared/basecamp-requirements-readonly/SKILL.md
+    bucket: LIBRARY
+  shared/basecamp-source-verification:
+    source: local
+    path: skills/shared/basecamp-source-verification/SKILL.md
+    bucket: LIBRARY
+  shared/github-context-readonly:
+    source: local
+    path: skills/shared/github-context-readonly/SKILL.md
+    bucket: LIBRARY
+  shared/requirement-extraction:
+    source: local
+    path: skills/shared/requirement-extraction/SKILL.md
+    bucket: LIBRARY
+  shared/acceptance-criteria:
+    source: local
+    path: skills/shared/acceptance-criteria/SKILL.md
+    bucket: LIBRARY
+  shared/review-aggregation:
+    source: local
+    path: skills/shared/review-aggregation/SKILL.md
+    bucket: LIBRARY
+  shared/code-review:
+    source: local
+    path: skills/shared/code-review/SKILL.md
+    bucket: LIBRARY
+  shopify/figma-to-shopify:
+    source: local
+    path: skills/shopify/figma-to-shopify/SKILL.md
+    dependencies_source: local
+    bucket: LIBRARY
+    references:
+      - skills/shopify/figma-to-shopify/references/asset-manifest.md
+      - skills/shopify/figma-to-shopify/references/figma-checklist.md
+      - skills/shopify/figma-to-shopify/references/screenshot-comparison.md
+    rules:
+      - rules/common/git-push-restriction-rules.md
+      - rules/shopify/modify-section-rules.md
+      - rules/shopify/new-section-rules.md
+      - rules/shopify/reuse-section-rules.md
+  daily-common/meeting-minutes:
+    source: local
+    path: skills/daily-common/meeting-minutes/SKILL.md
+    bucket: LIBRARY
+    references:
+      - skills/daily-common/meeting-minutes/references/field-collection.md
+      - skills/daily-common/meeting-minutes/references/input-formats.md
+      - skills/daily-common/meeting-minutes/references/output-verification.md
+      - skills/daily-common/meeting-minutes/references/template-fields.md
+    scripts:
+      - skills/daily-common/meeting-minutes/scripts/fill_interview_docx.py
+  shared/coding-standards:
+    source: local
+    path: skills/shared/coding-standards/SKILL.md
+    bucket: LIBRARY
+  shared/basecamp:
+    source: local
+    path: skills/shared/basecamp/SKILL.md
+    bucket: LIBRARY
+  shared/github:
+    source: local
+    path: skills/shared/github/SKILL.md
+    bucket: LIBRARY
+  shared/ego-browser:
+    source: local
+    path: skills/shared/ego-browser/SKILL.md
+    bucket: LIBRARY
+  shared/codex-computer-use:
+    source: local
+    path: skills/shared/codex-computer-use/SKILL.md
+    bucket: LIBRARY
+  java/feature-implementation:
+    source: local
+    path: skills/java/feature-implementation/SKILL.md
+    bucket: DAILY
+  java/feature-investigation:
+    source: local
+    path: skills/java/feature-investigation/SKILL.md
+    bucket: DAILY
+  java/test-planning:
+    source: local
+    path: skills/java/test-planning/SKILL.md
+    bucket: DAILY
+  shopify/shopify-dev:
+    source: local
+    path: skills/shopify/shopify-dev/SKILL.md
+    bucket: LIBRARY
+    scripts:
+      - skills/shopify/shopify-dev/scripts/search_docs.mjs
+  shopify/theme-investigation:
+    source: local
+    path: skills/shopify/theme-investigation/SKILL.md
+    bucket: DAILY
+    rules:
+      - rules/common/browser-testing-rules.md
+      - rules/common/git-push-restriction-rules.md
+  shopify/theme-implementation:
+    source: local
+    path: skills/shopify/theme-implementation/SKILL.md
+    bucket: DAILY
+    rules:
+      - rules/common/browser-testing-rules.md
+      - rules/common/git-push-restriction-rules.md
+      - rules/shopify/media-asset-rules.md
+      - rules/shopify/modify-section-rules.md
+      - rules/shopify/new-section-rules.md
+      - rules/shopify/reuse-section-rules.md
+      - rules/shopify/seo-rules.md
+      - rules/shopify/theme-style-variable-rules.md
+  shopify/initialize-shopify-project:
+    source: local
+    path: skills/shopify/initialize-shopify-project/SKILL.md
+    dependencies_source: local
+    bucket: LIBRARY
+    scripts:
+      - skills/shopify/initialize-shopify-project/scripts/init_shopify_project.py
+    references:
+      - skills/shopify/initialize-shopify-project/assets/templates/guides/init-shopify-project.md
+      - skills/shopify/initialize-shopify-project/assets/templates/guides/shopify-rules.md
+    rules:
+      - rules/common/browser-testing-rules.md
+      - rules/common/git-push-restriction-rules.md
+      - rules/shopify/media-asset-rules.md
+      - rules/shopify/modify-section-rules.md
+      - rules/shopify/new-section-rules.md
+      - rules/shopify/reuse-section-rules.md
+      - rules/shopify/seo-rules.md
+      - rules/shopify/theme-style-variable-rules.md

@@ -1,0 +1,11 @@
+profile:
+  id: browser-preview
+  # ChatGPT/Codex uses the installed Computer Use plugin first; this profile is
+  # the portable Ego Browser fallback after recorded unavailability or failure.
+  server: ego-browser-cli
+  adapter: cli-skill
+  lifecycle: step
+  roots: ["${PROJECT_ROOT}"]
+  tools:
+    allow: [open_local, screenshot, inspect_console]
+    deny: [submit_form, upload_file, publish]

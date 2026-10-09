@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.coverage
+htmlcov/
+.venv/
+.env
+!skills/shopify/initialize-shopify-project/assets/templates/env/.env
+.DS_Store
+dist/
+build/
+*.egg-info/

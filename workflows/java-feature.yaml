@@ -1,0 +1,57 @@
+workflow:
+  id: java-feature
+  version: 1
+  executor_skills: [shared/workflow-execution]
+  allowed_capabilities: [code_read, code_write, document_write, test_run, github_read, web_read]
+steps:
+  - id: inspect_remote_context
+    agent: java-developer
+    skills: [java/feature-investigation]
+    capabilities: [code_read, github_read]
+    mcp: [github-readonly]
+    remote_read:
+      type: mcp
+      profile: github-readonly
+    outputs:
+      - id: remote_context
+        transport: agent_result
+        format: json
+        required: true
+    when: {repository_is_remote: true}
+  - id: implement
+    agent: java-developer
+    skills: [java/feature-implementation]
+    capabilities: [code_read, code_write, document_write]
+    mcp: [project-files-workspace-write]
+    inputs_from:
+      - step: inspect_remote_context
+        artifact: remote_context
+        required: true
+        when: {repository_is_remote: true}
+    outputs:
+      - id: implementation
+        path: .agentflow/runs/<task-id>/implementation.json
+        format: json
+        schema: implementation-result-v1
+        required: true
+  - id: test
+    agent: java-developer
+    skills: [java/test-planning]
+    capabilities: [code_read, document_write, test_run]
+    mcp: [project-files-workspace-write]
+    inputs_from:
+      - step: implement
+        artifact: implementation
+        required: true
+    outputs:
+      - id: test_result
+        path: .agentflow/runs/<task-id>/test-result.json
+        format: json
+        schema: test-result-v1
+        required: true
+output:
+  schema: implementation-result-v1
+  artifacts:
+    implementation: ".agentflow/runs/<task-id>/implementation.json"
+    test_result: ".agentflow/runs/<task-id>/test-result.json"
+  requires_human_approval: false

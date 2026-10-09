@@ -1,0 +1,15 @@
+project:
+  id: replace-with-java-project-id
+  domain: java
+agent_profile:
+  default: java-developer
+allowed_workflows: [project-onboarding, product-spec, java-feature, code-review]
+skill_namespaces:
+  allow: [shared, java]
+  deny: [shopify]
+mcp_profiles:
+  default: [project-files]
+  optional: [project-files-workspace-write, github-readonly, public-web-search, basecamp-readonly, figma-readonly]
+context:
+  include: [README.md, AGENTS.md, pom.xml, docs/**, .agents/project.yaml, .agents/rules/**, .agents/memory/README.md, .agents/memory/global.md, .agents/memory/java.md, .agents/memory/workflows.md, .agents/memory/integrations.md]
+  exclude: [.git/**, target/**, logs/**]

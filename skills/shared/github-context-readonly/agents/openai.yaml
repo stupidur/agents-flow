@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub Context Read-only"
+  short_description: "Inspect GitHub repository context without writes"
+  default_prompt: "Use $github-context-readonly to inspect GitHub context without modifying the repository."

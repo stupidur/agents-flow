@@ -1,0 +1,7 @@
+profile:
+  id: shopify-dev-mcp
+  server: shopify-dev-mcp
+  lifecycle: step
+  tools:
+    allow: [search_docs, read_docs, get_api_reference]
+    deny: [write_store, publish, deploy, update_store]

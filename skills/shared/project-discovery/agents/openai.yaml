@@ -1,0 +1,4 @@
+interface:
+  display_name: "Project Discovery"
+  short_description: "Inspect a repository and map its stable structure"
+  default_prompt: "Use $project-discovery to inspect this repository and produce an evidence-based project map."

@@ -1,0 +1,52 @@
+workflow:
+  id: shopify-project-onboarding
+  version: 1
+  executor_skills: [shared/workflow-execution]
+  allowed_capabilities: [project_read, document_write]
+steps:
+  - id: discover_shopify_theme
+    agent: requirement-analyst
+    model_tier: medium
+    skills: [shared/project-discovery]
+    capabilities: [project_read, document_write]
+    outputs:
+      - id: shopify_project_map
+        path: .agentflow/workflows/<task-id>/shopify-project-map.json
+        format: json
+        schema: shopify-project-map-v1
+        required: true
+  - id: author_shopify_agents_context
+    agent: requirement-analyst
+    model_tier: medium
+    skills: [shared/agents-context-authoring, shopify/initialize-shopify-project]
+    capabilities: [project_read, document_write]
+    inputs_from:
+      - step: discover_shopify_theme
+        artifact: shopify_project_map
+        required: true
+    source_policy:
+      mode: artifact-only
+      source_step: discover_shopify_theme
+      source_artifact: shopify_project_map
+      on_missing: stop
+    outputs:
+      - id: project_context
+        path: AGENTS.md
+        format: markdown
+        required: true
+      - id: project_rules
+        path: .agents/rules/**
+        format: markdown
+        required: true
+      - id: project_gitignore
+        path: .gitignore
+        format: text
+        required: true
+output:
+  schema: shopify-project-onboarding-v1
+  artifacts:
+    project_context: AGENTS.md
+    project_rules: .agents/rules/**
+    project_gitignore: .gitignore
+    project_memory: .agents/memory/**
+  requires_human_approval: false

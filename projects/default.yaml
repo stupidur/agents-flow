@@ -1,0 +1,15 @@
+project:
+  id: unconfigured-project
+  domain: unknown
+agent_profile:
+  default: coordinator
+allowed_workflows: [project-onboarding, product-spec, code-review]
+skill_namespaces:
+  allow: [shared]
+  deny: [java, shopify]
+mcp_profiles:
+  default: [project-files]
+  optional: [project-files-workspace-write, github-readonly, public-web-search, basecamp-readonly, figma-readonly]
+context:
+  include: [README.md, AGENTS.md, .agents/project.yaml, .agents/rules/**, .agents/memory/README.md, .agents/memory/global.md, .agents/memory/workflows.md, .agents/memory/integrations.md]
+  exclude: [.git/**, node_modules/**, .venv/**, dist/**]

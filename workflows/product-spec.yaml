@@ -1,0 +1,192 @@
+workflow:
+  id: product-spec
+  version: 1
+  executor_skills: [shared/workflow-execution]
+  allowed_capabilities: [requirement_analysis, document_write, project_read, basecamp_read, figma_read]
+steps:
+  - id: inspect_basecamp_context
+    agent: requirement-analyst
+    skills: [shared/basecamp-requirements-readonly]
+    capabilities: [basecamp_read, requirement_analysis, document_write]
+    mcp: []
+    remote_read:
+      type: skill
+      skill: shared/basecamp-requirements-readonly
+      command: basecamp
+      on_unavailable: skip_dependents
+    outputs:
+      - id: basecamp_context
+        path: .agentflow/workflows/<task-id>/basecamp-context.json
+        format: json
+        schema: basecamp-context-v1
+        required: true
+    when: {requirements_source: basecamp}
+  - id: inspect_existing_behavior
+    agent: requirement-analyst
+    model_tier: small
+    skills: [shared/requirement-extraction]
+    capabilities: [project_read]
+    mcp:
+      - profile: project-files
+        when: {existing_behavior_required: true}
+    outputs:
+      - id: existing_behavior
+        transport: agent_result
+        format: json
+        required: true
+    when: {existing_behavior_required: true}
+  - id: inspect_design_context
+    agent: requirement-analyst
+    skills: [shared/requirement-extraction]
+    capabilities: [figma_read, requirement_analysis]
+    mcp: [figma-readonly]
+    outputs:
+      - id: design_context
+        transport: agent_result
+        format: json
+        required: true
+    when: {source_design: figma}
+  - id: extract
+    agent: requirement-analyst
+    model_tier: small
+    skills: [shared/requirement-extraction]
+    capabilities: [requirement_analysis, document_write]
+    mcp: []
+    inputs_from:
+      - step: inspect_basecamp_context
+        artifact: basecamp_context
+        required: true
+        when: {requirements_source: basecamp}
+      - step: inspect_existing_behavior
+        artifact: existing_behavior
+        required: true
+        when: {existing_behavior_required: true}
+      - step: inspect_design_context
+        artifact: design_context
+        required: true
+        when: {source_design: figma}
+    source_policy:
+      when: {requirements_source: basecamp}
+      mode: artifact-only
+      source_step: inspect_basecamp_context
+      source_artifact: basecamp_context
+      forbidden_sources: [local_spec, branch_name, filename, similar_feature, unstated_assumption]
+      on_missing: skip_dependents
+    outputs:
+      - id: requirements_evidence
+        path: .agentflow/workflows/<task-id>/requirements-extracted.json
+        format: json
+        schema: requirements-evidence-v1
+        required: true
+  - id: verify_basecamp_source
+    agent: requirement-analyst
+    model_tier: small
+    skills: [shared/basecamp-source-verification]
+    capabilities: [requirement_analysis, document_write]
+    mcp: []
+    inputs_from:
+      - step: inspect_basecamp_context
+        artifact: basecamp_context
+        required: true
+      - step: extract
+        artifact: requirements_evidence
+        required: true
+    source_policy:
+      mode: artifact-only
+      source_step: inspect_basecamp_context
+      source_artifact: basecamp_context
+      forbidden_sources: [local_spec, branch_name, filename, similar_feature, unstated_assumption]
+      on_missing: skip_dependents
+    gates:
+      - id: basecamp_source_consistency
+        type: source_consistency
+        required: true
+        checks: [artifact_exists, valid_json, source_url_present, source_id_present, title_nonempty, body_complete, requirements_cite_source]
+        on_failure: skip_dependents
+    outputs:
+      - id: source_verification
+        path: .agentflow/workflows/<task-id>/basecamp-source-verification.json
+        format: json
+        schema: basecamp-source-verification-v1
+        required: true
+    when: {requirements_source: basecamp}
+  - id: acceptance_criteria
+    agent: requirement-analyst
+    model_tier: small
+    skills: [shared/acceptance-criteria]
+    capabilities: [requirement_analysis, document_write]
+    mcp: []
+    inputs_from:
+      - step: inspect_basecamp_context
+        artifact: basecamp_context
+        required: true
+        when: {requirements_source: basecamp}
+      - step: extract
+        artifact: requirements_evidence
+        required: true
+      - step: verify_basecamp_source
+        artifact: source_verification
+        required: true
+        when: {requirements_source: basecamp}
+    source_policy:
+      when: {requirements_source: basecamp}
+      mode: artifact-only
+      source_step: inspect_basecamp_context
+      source_artifact: basecamp_context
+      title_from: basecamp_context.title
+      forbidden_sources: [local_spec, branch_name, filename, similar_feature, unstated_assumption]
+      on_missing: skip_dependents
+    requires_gates:
+      - id: basecamp_source_consistency
+        when: {requirements_source: basecamp}
+    outputs:
+      - id: specification
+        path: docs/specs/<task-id>.md
+        format: markdown
+        schema: product-spec-v1
+        required: true
+  - id: verify_specification_source
+    agent: requirement-analyst
+    model_tier: small
+    skills: [shared/basecamp-source-verification]
+    capabilities: [requirement_analysis, project_read, document_write]
+    mcp: [project-files-workspace-write]
+    inputs_from:
+      - step: inspect_basecamp_context
+        artifact: basecamp_context
+        required: true
+      - step: acceptance_criteria
+        artifact: specification
+        required: true
+      - step: verify_basecamp_source
+        artifact: source_verification
+        required: true
+    source_policy:
+      mode: artifact-only
+      source_step: inspect_basecamp_context
+      source_artifact: basecamp_context
+      title_from: basecamp_context.title
+      forbidden_sources: [local_spec, branch_name, filename, similar_feature, unstated_assumption]
+      on_missing: skip_dependents
+    gates:
+      - id: specification_source_consistency
+        type: specification_source_consistency
+        required: true
+        checks: [spec_exists, spec_title_matches_source, spec_requirements_trace_to_source, assumptions_are_separate]
+        on_failure: skip_dependents
+    outputs:
+      - id: specification_verification
+        path: .agentflow/workflows/<task-id>/specification-verification.json
+        format: json
+        schema: specification-source-verification-v1
+        required: true
+    when: {requirements_source: basecamp}
+output:
+  schema: product-spec-v1
+  artifacts:
+    basecamp_context: ".agentflow/workflows/<task-id>/basecamp-context.json"
+    requirements_evidence: ".agentflow/workflows/<task-id>/requirements-extracted.json"
+    source_verification: ".agentflow/workflows/<task-id>/basecamp-source-verification.json"
+    specification_verification: ".agentflow/workflows/<task-id>/specification-verification.json"
+    specification: "docs/specs/<task-id>.md"
+  requires_human_approval: false
